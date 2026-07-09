@@ -97,28 +97,45 @@ PRIJS_LABELS = {
 
 
 # ================================================================ BEREKENINGEN
+def _vk(inkoop: float, verkoop_override: float, marge: float) -> float:
+    """Verkoopprijs: gebruik de manueel ingegeven verkoopprijs als die is ingevuld
+    (> 0), anders automatisch inkoop x marge%. Zo klopt de marge altijd, ook als
+    je zelf een vaste catalogus-/verkoopprijs intikt die niets met de marge% te
+    maken heeft (bv. Panasonic-toestellen waar plaatsing al inbegrepen zit)."""
+    return verkoop_override if verkoop_override and verkoop_override > 0 else inkoop * marge
+
+
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
     n = inp["n_binnen"]
 
-    mat = []  # (omschrijving, aantal-tekst, inkoop)
-    mat.append((f"Buitenunit {inp['merk_model']}".strip(), "1 st", inp["prijs_buiten"]))
-    mat.append((f"Binnenunit(s)", f"{n} st", inp["prijs_binnen"] * n))
-    mat.append(("Koelleidingen (geïsoleerd)", f"{inp['leiding_m']} m", inp["leiding_m"] * P["a_leiding_pm"]))
+    buiten_inkoop = inp["prijs_buiten"]
+    buiten_verkoop = _vk(buiten_inkoop, inp.get("prijs_buiten_verkoop", 0), marge)
+    binnen_inkoop = inp["prijs_binnen"] * n
+    binnen_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge) * n
+
+    mat = []  # (omschrijving, aantal-tekst, inkoop, verkoop)
+    mat.append((f"Buitenunit {inp['merk_model']}".strip(), "1 st", buiten_inkoop, buiten_verkoop))
+    mat.append((f"Binnenunit(s)", f"{n} st", binnen_inkoop, binnen_verkoop))
+
+    def std(om, aantal, inkoop):
+        mat.append((om, aantal, inkoop, inkoop * marge))
+
+    std("Koelleidingen (geïsoleerd)", f"{inp['leiding_m']} m", inp["leiding_m"] * P["a_leiding_pm"])
     if inp["goot_m"] > 0:
-        mat.append(("Sierlijst / leidinggoot", f"{inp['goot_m']} m", inp["goot_m"] * P["a_goot_pm"]))
-    mat.append(("Klein materiaal & bevestiging", "", P["a_klein_basis"] + n * P["a_klein_per_unit"]))
+        std("Sierlijst / leidinggoot", f"{inp['goot_m']} m", inp["goot_m"] * P["a_goot_pm"])
+    std("Klein materiaal & bevestiging", "", P["a_klein_basis"] + n * P["a_klein_per_unit"])
     if inp["koelmiddel_m"] > 0:
-        mat.append(("Extra koelmiddel R32", f"{inp['koelmiddel_m']} m", inp["koelmiddel_m"] * P["a_koelmiddel_pm"]))
+        std("Extra koelmiddel R32", f"{inp['koelmiddel_m']} m", inp["koelmiddel_m"] * P["a_koelmiddel_pm"])
     if inp["condenspomp"]:
-        mat.append(("Condenspomp", "1 st", P["a_condenspomp"]))
+        std("Condenspomp", "1 st", P["a_condenspomp"])
     if inp["console"]:
-        mat.append(("Muurconsole + trillingsdempers", "1 st", P["a_console"]))
+        std("Muurconsole + trillingsdempers", "1 st", P["a_console"])
     if inp["elek"]:
-        mat.append(("Elektrisch materiaal", "", P["a_elek_mat"]))
+        std("Elektrisch materiaal", "", P["a_elek_mat"])
 
     mat_inkoop = sum(m[2] for m in mat)
-    mat_verkoop = mat_inkoop * marge
+    mat_verkoop = sum(m[3] for m in mat)
 
     uren_auto = (
         P["a_uren_basis"]
@@ -128,7 +145,8 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         + (P["a_uren_pomp"] if inp["condenspomp"] else 0)
     )
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
-    arbeid = uren * inp["techniekers"] * P["uurtarief"]
+    arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
+    arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
 
     km_kost = inp["km"] * P["km_prijs"] * 2
     extra = P["a_hoogtewerker"] if inp["hoogtewerker"] else 0.0
@@ -144,6 +162,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     return {
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
+        "arbeid_aanrekenen": arbeid_aanrekenen,
         "km_kost": km_kost, "vast": P["vast_dossier"], "extra_hoogte": extra,
         "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
         "marge": marge,
@@ -153,31 +172,38 @@ def bereken_airco(inp: dict, P: dict) -> dict:
 def bereken_wp(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
 
-    mat = [(f"Warmtepomp {inp['kw']} kW {inp['type']} {inp['merk_model']}".strip(), "1 st", inp["prijs_wp"])]
+    wp_inkoop = inp["prijs_wp"]
+    wp_verkoop = _vk(wp_inkoop, inp.get("prijs_wp_verkoop", 0), marge)
+
+    mat = [(f"Warmtepomp {inp['kw']} kW {inp['type']} {inp['merk_model']}".strip(), "1 st", wp_inkoop, wp_verkoop)]
+
+    def std(om, aantal, inkoop):
+        mat.append((om, aantal, inkoop, inkoop * marge))
+
     if inp["buffer"] == 50:
-        mat.append(("Buffervat 50 L", "1 st", P["w_buffer_50"]))
+        std("Buffervat 50 L", "1 st", P["w_buffer_50"])
     elif inp["buffer"] == 100:
-        mat.append(("Buffervat 100 L", "1 st", P["w_buffer_100"]))
+        std("Buffervat 100 L", "1 st", P["w_buffer_100"])
     elif inp["buffer"] == 200:
-        mat.append(("Buffervat 200 L", "1 st", P["w_buffer_200"]))
+        std("Buffervat 200 L", "1 st", P["w_buffer_200"])
     if inp["boiler"] == 200:
-        mat.append(("Sanitair warmwaterboiler 200 L", "1 st", P["w_boiler_200"]))
+        std("Sanitair warmwaterboiler 200 L", "1 st", P["w_boiler_200"])
     elif inp["boiler"] == 300:
-        mat.append(("Sanitair warmwaterboiler 300 L", "1 st", P["w_boiler_300"]))
+        std("Sanitair warmwaterboiler 300 L", "1 st", P["w_boiler_300"])
     if inp["hydro"]:
-        mat.append(("Hydraulisch materiaal (leidingen, kranen, expansievat)", "", P["w_hydro"]))
+        std("Hydraulisch materiaal (leidingen, kranen, expansievat)", "", P["w_hydro"])
     if inp["elek"]:
-        mat.append(("Elektrisch materiaal & sturing", "", P["w_elek_mat"]))
+        std("Elektrisch materiaal & sturing", "", P["w_elek_mat"])
     if inp["sokkel"]:
-        mat.append(("Sokkel / grondconsole buitenunit", "1 st", P["w_sokkel"]))
+        std("Sokkel / grondconsole buitenunit", "1 st", P["w_sokkel"])
     if inp["afvoer_oud"]:
-        mat.append(("Afbraak & afvoer oude installatie", "", P["w_afvoer_oud"]))
+        std("Afbraak & afvoer oude installatie", "", P["w_afvoer_oud"])
     if inp["regeling"]:
-        mat.append(("Slimme thermostaat / weersafhankelijke regeling", "1 st", P["w_regeling"]))
-    mat.append(("Klein materiaal & verbruiksgoederen", "", P["w_klein"]))
+        std("Slimme thermostaat / weersafhankelijke regeling", "1 st", P["w_regeling"])
+    std("Klein materiaal & verbruiksgoederen", "", P["w_klein"])
 
     mat_inkoop = sum(m[2] for m in mat)
-    mat_verkoop = mat_inkoop * marge
+    mat_verkoop = sum(m[3] for m in mat)
 
     uren_auto = P["w_uren_monoblock"] if inp["type"] == "monoblock" else P["w_uren_split"]
     if inp["elek"]:
@@ -192,7 +218,8 @@ def bereken_wp(inp: dict, P: dict) -> dict:
         uren_auto += P["w_uren_gemengd"]
 
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
-    arbeid = uren * inp["techniekers"] * P["uurtarief"]
+    arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
+    arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
     km_kost = inp["km"] * P["km_prijs"] * 2
 
     subtotaal = mat_verkoop + arbeid + km_kost + P["vast_dossier"]
@@ -206,6 +233,7 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     return {
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
+        "arbeid_aanrekenen": arbeid_aanrekenen,
         "km_kost": km_kost, "vast": P["vast_dossier"], "extra_hoogte": 0.0,
         "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
         "marge": marge,
@@ -216,6 +244,27 @@ def bereken_wp(inp: dict, P: dict) -> dict:
 NAVY = (14, 42, 71)
 ORANGE = (242, 140, 40)
 GREY = (244, 246, 248)
+
+# Tekens die de standaard Helvetica/latin-1 encoding niet aankan (crasht anders de PDF)
+_PDF_REPLACEMENTS = {
+    "\u2014": "-", "\u2013": "-",      # em-dash, en-dash
+    "\u2018": "'", "\u2019": "'",      # curly quotes
+    "\u201c": '"', "\u201d": '"',
+    "\u2026": "...",
+}
+
+
+def _safe(text, use_uni: bool) -> str:
+    """Maakt tekst veilig voor de PDF-font: vervangt bekende speciale tekens,
+    en vangt al de rest op zodat de app nooit crasht op een onverwacht teken."""
+    if text is None:
+        return ""
+    text = str(text)
+    if use_uni:
+        return text
+    for k, v in _PDF_REPLACEMENTS.items():
+        text = text.replace(k, v)
+    return text.encode("latin-1", "replace").decode("latin-1")
 
 BEDRIJFSINFO = [
     "P&R Koeltechnieken",
@@ -248,6 +297,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     except Exception:
         pass
     F = "DejaVu" if use_uni else "Helvetica"
+    S = lambda t: _safe(t, use_uni)
 
     # --- Navy header-balk ---
     pdf.set_fill_color(*NAVY)
@@ -277,7 +327,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.cell(0, 10, "Offerte", ln=1)
     pdf.set_font(F, "B", 12)
     pdf.set_text_color(*ORANGE)
-    pdf.cell(0, 7, titel, ln=1)
+    pdf.cell(0, 7, S(titel), ln=1)
 
     pdf.set_text_color(60, 60, 60)
     pdf.set_font(F, "", 9)
@@ -290,10 +340,10 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     ]
     for i, d in enumerate(details):
         pdf.set_xy(12, y0 + i * 5)
-        pdf.cell(90, 5, d)
+        pdf.cell(90, 5, S(d))
     for i, lijn in enumerate(BEDRIJFSINFO):
         pdf.set_xy(130, y0 + i * 5)
-        pdf.cell(0, 5, lijn)
+        pdf.cell(0, 5, S(lijn))
 
     # --- Klant ---
     pdf.set_y(y0 + max(len(details), len(BEDRIJFSINFO)) * 5 + 6)
@@ -304,19 +354,19 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_text_color(40, 40, 40)
     for veld in ("bedrijf", "naam"):
         if klant.get(veld, "").strip():
-            pdf.cell(0, 5, klant[veld], ln=1)
+            pdf.cell(0, 5, S(klant[veld]), ln=1)
     for regel in klant.get("adres", "").split("\n"):
         if regel.strip():
-            pdf.cell(0, 5, regel, ln=1)
+            pdf.cell(0, 5, S(regel), ln=1)
     for veld, prefix in (("email", "E-mail: "), ("tel", "Tel.: ")):
         if klant.get(veld, "").strip():
-            pdf.cell(0, 5, prefix + klant[veld], ln=1)
+            pdf.cell(0, 5, S(prefix + klant[veld]), ln=1)
 
     # --- Intro ---
     pdf.ln(4)
     pdf.set_font(F, "", 9)
     pdf.set_text_color(60, 60, 60)
-    pdf.multi_cell(0, 5, intro)
+    pdf.multi_cell(0, 5, S(intro))
     pdf.ln(4)
 
     # --- Kostentabel ---
@@ -339,15 +389,20 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     def row(om, aantal, bedrag):
         nonlocal fill
         pdf.set_fill_color(*(GREY if fill else (255, 255, 255)))
-        pdf.cell(110, 7, om[:68], border=1, fill=True)
-        pdf.cell(35, 7, aantal, border=1, align="C", fill=True)
+        pdf.cell(110, 7, S(om)[:68], border=1, fill=True)
+        pdf.cell(35, 7, S(aantal), border=1, align="C", fill=True)
         pdf.cell(41, 7, f"{bedrag:,.2f}".replace(",", " "), border=1, align="R", fill=True)
         pdf.ln(7)
         fill = not fill
 
-    for om, aantal, inkoop in res["mat"]:
-        row(om, aantal, inkoop * res["marge"])
-    row(f"Installatie & indienststelling ({res['uren']:.1f} u x {inp['techniekers']} technieker(s))", "", res["arbeid"])
+    for om, aantal, inkoop, verkoop in res["mat"]:
+        row(om, aantal, verkoop)
+
+    if res.get("arbeid_aanrekenen", True):
+        row(f"Installatie & indienststelling ({res['uren']:.1f} u x {inp['techniekers']} technieker(s))", "", res["arbeid"])
+    else:
+        row("Installatie & indienststelling (inbegrepen in toestelprijs)", "", 0.0)
+
     if res["km_kost"] > 0:
         row("Verplaatsing", f"{inp['km']} km", res["km_kost"])
     row("Dossier & opstart", "", res["vast"])
@@ -359,7 +414,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     def tot_row(label, bedrag, bold=False, orange=False):
         pdf.set_font(F, "B" if bold else "", 10 if not bold else 11)
         pdf.set_text_color(*(ORANGE if orange else NAVY))
-        pdf.cell(145, 7, label, align="R")
+        pdf.cell(145, 7, S(label), align="R")
         pdf.cell(41, 7, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
 
     tot_row("Subtotaal excl. BTW", res["subtotaal"])
@@ -370,12 +425,12 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.ln(6)
     pdf.set_font(F, "", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.multi_cell(0, 4.5,
+    pdf.multi_cell(0, 4.5, S(
         "Deze offerte is opgemaakt op basis van de door de klant verstrekte informatie. "
         "Prijzen zijn geldig tot de vermelde vervaldatum. Meerwerken door onvoorziene omstandigheden "
-        "(bv. asbest, ontoegankelijke leidingtrace's, extra doorboringen) worden in regie aangerekend na overleg. "
+        "(bv. asbest, ontoegankelijke leidingtraces, extra doorboringen) worden in regie aangerekend na overleg. "
         "Opdrachtgever voorziet een vrije en veilige toegang tot de werf en een werkende elektrische aansluiting. "
-        "Bij toepassing van 6% BTW bevestigt de klant dat de woning ouder is dan 10 jaar en hoofdzakelijk privé wordt gebruikt.")
+        "Bij toepassing van 6% BTW bevestigt de klant dat de woning ouder is dan 10 jaar en hoofdzakelijk privé wordt gebruikt."))
 
     out = pdf.output(dest="S")
     return bytes(out) if isinstance(out, (bytes, bytearray)) else out.encode("latin-1")

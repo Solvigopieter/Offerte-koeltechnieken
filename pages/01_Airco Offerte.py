@@ -50,8 +50,13 @@ with c3:
     n_binnen = TYPES[type_label]
     merk_model = st.text_input("Merk & model (op offerte)", key="a_merk", placeholder="bv. Daikin Perfera 3,5 kW")
 with c4:
+    st.markdown("**Buitenunit**")
     prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=900.0, step=10.0, key="a_prijs_buiten")
+    prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_buiten_verkoop",
+        help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in als je zelf een vaste verkoopprijs hanteert (bv. Panasonic-catalogusprijs), los van de marge-instelling.")
+    st.markdown("**Binnenunit**")
     prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
+    prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
 with c5:
     leiding_m = st.number_input("Totale leidinglengte (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
     goot_m = st.number_input("Sierlijst / leidinggoot (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
@@ -67,21 +72,29 @@ with c7:
     hoogtewerker = st.checkbox("Hoogtewerker / moeilijke toegang", key="a_hoogtewerker")
 with c8:
     techniekers = st.number_input("Aantal techniekers", min_value=1, value=2, key="a_techniekers")
-    uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="a_uren")
+    arbeid_aanrekenen = st.checkbox("Arbeid apart aanrekenen", value=True, key="a_arbeid_aanrekenen",
+        help="Uitvinken als de installatie al inbegrepen zit in de toestelprijs (bv. bij sommige Panasonic-marges).")
+    uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="a_uren", disabled=not arbeid_aanrekenen)
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="a_km")
     btw = st.selectbox("BTW-tarief", [0.21, 0.06], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="a_btw")
 
 # ================= Berekening =================
 inp = dict(n_binnen=n_binnen, merk_model=merk_model, prijs_buiten=prijs_buiten,
-           prijs_binnen=prijs_binnen, leiding_m=leiding_m, goot_m=goot_m,
+           prijs_buiten_verkoop=prijs_buiten_verkoop,
+           prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
+           leiding_m=leiding_m, goot_m=goot_m,
            doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
            console=console, elek=elek, hoogtewerker=hoogtewerker,
-           techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw)
+           techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
+           arbeid_aanrekenen=arbeid_aanrekenen)
 res = bereken_airco(inp, P)
 
 st.subheader("Offerte-opbouw")
-rows = [{"Omschrijving": m[0], "Aantal": m[1], "Verkoop (EUR)": round(m[2] * res["marge"], 2)} for m in res["mat"]]
-rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Verkoop (EUR)": round(res["arbeid"], 2)})
+rows = [{"Omschrijving": m[0], "Aantal": m[1], "Verkoop (EUR)": round(m[3], 2)} for m in res["mat"]]
+if arbeid_aanrekenen:
+    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Verkoop (EUR)": round(res["arbeid"], 2)})
+else:
+    rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Verkoop (EUR)": 0.0})
 rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Verkoop (EUR)": round(res["km_kost"], 2)})
 rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Verkoop (EUR)": round(res["vast"], 2)})
 if res["extra_hoogte"] > 0:

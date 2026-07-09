@@ -50,6 +50,8 @@ with c3:
     merk_model = st.text_input("Merk & model (op offerte)", key="w_merk", placeholder="bv. Daikin Altherma 3")
 with c4:
     prijs_wp = st.number_input("Inkoopprijs warmtepomp (EUR)", min_value=0.0, value=5200.0, step=50.0, key="w_prijs")
+    prijs_wp_verkoop = st.number_input("Verkoopprijs warmtepomp (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=50.0, key="w_prijs_verkoop",
+        help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in als je zelf een vaste verkoopprijs hanteert, los van de marge-instelling.")
     afgifte = st.selectbox("Afgiftesysteem", ["Vloerverwarming", "Radiatoren", "Gemengd"], key="w_afgifte")
 with c5:
     buffer = st.selectbox("Buffervat", [0, 50, 100, 200], index=1,
@@ -67,20 +69,27 @@ with c7:
     regeling = st.checkbox("Slimme thermostaat / regeling", key="w_regeling")
 with c8:
     techniekers = st.number_input("Aantal techniekers", min_value=1, value=2, key="w_techniekers")
-    uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="w_uren")
+    arbeid_aanrekenen = st.checkbox("Arbeid apart aanrekenen", value=True, key="w_arbeid_aanrekenen",
+        help="Uitvinken als de installatie al inbegrepen zit in de toestelprijs (bv. bij sommige Panasonic-marges).")
+    uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="w_uren", disabled=not arbeid_aanrekenen)
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="w_km")
     btw = st.selectbox("BTW-tarief", [0.06, 0.21], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="w_btw")
 
 # ================= Berekening =================
-inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp, afgifte=afgifte,
+inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp,
+           prijs_wp_verkoop=prijs_wp_verkoop, afgifte=afgifte,
            buffer=buffer, boiler=boiler, hydro=hydro, elek=elek, sokkel=sokkel,
            afvoer_oud=afvoer_oud, regeling=regeling,
-           techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw)
+           techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
+           arbeid_aanrekenen=arbeid_aanrekenen)
 res = bereken_wp(inp, P)
 
 st.subheader("Offerte-opbouw")
-rows = [{"Omschrijving": m[0], "Aantal": m[1], "Verkoop (EUR)": round(m[2] * res["marge"], 2)} for m in res["mat"]]
-rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Verkoop (EUR)": round(res["arbeid"], 2)})
+rows = [{"Omschrijving": m[0], "Aantal": m[1], "Verkoop (EUR)": round(m[3], 2)} for m in res["mat"]]
+if arbeid_aanrekenen:
+    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Verkoop (EUR)": round(res["arbeid"], 2)})
+else:
+    rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Verkoop (EUR)": 0.0})
 rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Verkoop (EUR)": round(res["km_kost"], 2)})
 rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Verkoop (EUR)": round(res["vast"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
