@@ -44,10 +44,13 @@ with c2:
 st.subheader("Configuratie")
 c3, c4, c5 = st.columns(3)
 with c3:
-    TYPES = {"Mono-split (1 binnenunit)": 1, "Multi-split — 2 binnenunits": 2,
-             "Multi-split — 3 binnenunits": 3, "Multi-split — 4 binnenunits": 4}
+    TYPES = {"Mono-split (1 binnenunit per systeem)": 1, "Multi-split — 2 binnenunits op 1 buitenunit": 2,
+             "Multi-split — 3 binnenunits op 1 buitenunit": 3, "Multi-split — 4 binnenunits op 1 buitenunit": 4}
     type_label = st.selectbox("Type installatie", list(TYPES.keys()), key="a_type")
     n_binnen = TYPES[type_label]
+    aantal_systemen = st.number_input("Aantal aparte systemen (elk met eigen buitenunit)", min_value=1, value=1, step=1, key="a_aantal_systemen",
+        help="Bv. 3 losse mono-split airco's = 'Mono-split' + hier 3 invullen (3× eigen buitenunit). "
+             "Voor 1 buitenunit met 3 binnenunits kies je hierboven 'Multi-split — 3 binnenunits' en laat dit op 1 staan.")
     merk_model = st.text_input("Merk & model (op offerte)", key="a_merk", placeholder="bv. Daikin Perfera 3,5 kW")
 with c4:
     st.markdown("**Buitenunit**")
@@ -58,17 +61,17 @@ with c4:
     prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
     prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
 with c5:
-    leiding_m = st.number_input("Totale leidinglengte (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
-    goot_m = st.number_input("Sierlijst / leidinggoot (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
+    leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
+    goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
 
 c6, c7, c8 = st.columns(3)
 with c6:
-    doorvoeren = st.number_input("Muurdoorvoeren (aantal)", min_value=0, value=1, key="a_doorvoeren")
+    doorvoeren = st.number_input("Muurdoorvoeren, totaal aantal", min_value=0, value=1, key="a_doorvoeren")
     koelmiddel_m = st.number_input("Extra koelmiddel (m boven voorvulling)", min_value=0.0, value=0.0, step=1.0, key="a_koelmiddel")
 with c7:
-    condenspomp = st.checkbox("Condenspomp nodig", key="a_condenspomp")
-    console = st.checkbox("Muurconsole + trillingsdempers", value=True, key="a_console")
-    elek = st.checkbox("Elektrische voeding trekken", value=True, key="a_elek")
+    condenspomp = st.checkbox("Condenspomp nodig (per binnenunit)", key="a_condenspomp")
+    console = st.checkbox("Muurconsole + trillingsdempers (per systeem)", value=True, key="a_console")
+    elek = st.checkbox("Elektrische voeding trekken (per systeem)", value=True, key="a_elek")
     hoogtewerker = st.checkbox("Hoogtewerker / moeilijke toegang", key="a_hoogtewerker")
 with c8:
     techniekers = st.number_input("Aantal techniekers", min_value=1, value=2, key="a_techniekers")
@@ -79,7 +82,7 @@ with c8:
     btw = st.selectbox("BTW-tarief", [0.21, 0.06], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="a_btw")
 
 # ================= Berekening =================
-inp = dict(n_binnen=n_binnen, merk_model=merk_model, prijs_buiten=prijs_buiten,
+inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, merk_model=merk_model, prijs_buiten=prijs_buiten,
            prijs_buiten_verkoop=prijs_buiten_verkoop,
            prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
            leiding_m=leiding_m, goot_m=goot_m,
@@ -120,7 +123,8 @@ intro = ("Bedankt voor uw vertrouwen in P&R Koeltechnieken. Wij installeren uw a
          "U geniet van koeling in de zomer en zuinige verwarming in de winter.")
 
 with b1:
-    pdf_bytes = maak_pdf(f"Airco-installatie — {type_label}", klant, res, inp, intro)
+    titel_suffix = f" — {aantal_systemen}x apart systeem" if aantal_systemen > 1 else ""
+    pdf_bytes = maak_pdf(f"Airco-installatie — {type_label}{titel_suffix}", klant, res, inp, intro)
     st.download_button("📄 Download offerte (PDF)", data=pdf_bytes,
                        file_name=f"{klant['nummer']}_airco.pdf", mime="application/pdf",
                        use_container_width=True)

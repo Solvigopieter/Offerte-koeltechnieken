@@ -12,6 +12,7 @@ DEFAULT_PRIJZEN = {
     # Algemeen
     "uurtarief": 55.0,            # verkooptarief per technieker per uur
     "loonkost_intern": 38.0,      # interne kostprijs per uur (voor marge-indicatie)
+    "loonkost_meetellen": 0.0,    # 1 = loonkost aftrekken van brutomarge, 0 = niet (bv. als je (nog) solo werkt)
     "marge_materiaal_pct": 25.0,  # % marge op inkoop materiaal
     "km_prijs": 0.75,             # EUR per km (enkel)
     "vast_dossier": 75.0,         # vast opstart-/dossierbedrag per offerte
@@ -57,6 +58,7 @@ DEFAULT_PRIJZEN = {
 PRIJS_LABELS = {
     "uurtarief": "Uurtarief technieker (verkoop, EUR/u)",
     "loonkost_intern": "Interne loonkost (EUR/u, voor marge-info)",
+    "loonkost_meetellen": "Loonkost aftrekken van brutomarge? (checkbox hieronder)",
     "marge_materiaal_pct": "Marge op materiaal (%)",
     "km_prijs": "Kilometerprijs (EUR/km, enkel)",
     "vast_dossier": "Vast dossier-/opstartbedrag (EUR)",
@@ -161,7 +163,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     btw = subtotaal * inp["btw"]
     totaal = subtotaal + btw
 
-    loonkost = uren * inp["techniekers"] * P["loonkost_intern"]
+    loonkost = uren * inp["techniekers"] * P["loonkost_intern"] * P.get("loonkost_meetellen", 1.0)
     winst = subtotaal - mat_inkoop - loonkost - km_kost * 0.6
 
     return {
@@ -232,7 +234,7 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     btw = subtotaal * inp["btw"]
     totaal = subtotaal + btw
 
-    loonkost = uren * inp["techniekers"] * P["loonkost_intern"]
+    loonkost = uren * inp["techniekers"] * P["loonkost_intern"] * P.get("loonkost_meetellen", 1.0)
     winst = subtotaal - mat_inkoop - loonkost - km_kost * 0.6
 
     return {
