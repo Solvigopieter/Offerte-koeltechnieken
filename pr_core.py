@@ -107,16 +107,18 @@ def _vk(inkoop: float, verkoop_override: float, marge: float) -> float:
 
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
-    n = inp["n_binnen"]
+    n = inp["n_binnen"]                       # binnenunits per systeem
+    aantal_systemen = max(1, inp.get("aantal_systemen", 1))  # aantal aparte buitenunits
+    n_totaal = n * aantal_systemen             # totaal aantal binnenunits
 
-    buiten_inkoop = inp["prijs_buiten"]
-    buiten_verkoop = _vk(buiten_inkoop, inp.get("prijs_buiten_verkoop", 0), marge)
-    binnen_inkoop = inp["prijs_binnen"] * n
-    binnen_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge) * n
+    buiten_inkoop = inp["prijs_buiten"] * aantal_systemen
+    buiten_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge) * aantal_systemen
+    binnen_inkoop = inp["prijs_binnen"] * n_totaal
+    binnen_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge) * n_totaal
 
     mat = []  # (omschrijving, aantal-tekst, inkoop, verkoop)
-    mat.append((f"Buitenunit {inp['merk_model']}".strip(), "1 st", buiten_inkoop, buiten_verkoop))
-    mat.append((f"Binnenunit(s)", f"{n} st", binnen_inkoop, binnen_verkoop))
+    mat.append((f"Buitenunit {inp['merk_model']}".strip(), f"{aantal_systemen} st", buiten_inkoop, buiten_verkoop))
+    mat.append((f"Binnenunit(s)", f"{n_totaal} st", binnen_inkoop, binnen_verkoop))
 
     def std(om, aantal, inkoop):
         mat.append((om, aantal, inkoop, inkoop * marge))
@@ -124,26 +126,29 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     std("Koelleidingen (geïsoleerd)", f"{inp['leiding_m']} m", inp["leiding_m"] * P["a_leiding_pm"])
     if inp["goot_m"] > 0:
         std("Sierlijst / leidinggoot", f"{inp['goot_m']} m", inp["goot_m"] * P["a_goot_pm"])
-    std("Klein materiaal & bevestiging", "", P["a_klein_basis"] + n * P["a_klein_per_unit"])
+    std("Klein materiaal & bevestiging", "", P["a_klein_basis"] * aantal_systemen + n_totaal * P["a_klein_per_unit"])
     if inp["koelmiddel_m"] > 0:
         std("Extra koelmiddel R32", f"{inp['koelmiddel_m']} m", inp["koelmiddel_m"] * P["a_koelmiddel_pm"])
     if inp["condenspomp"]:
-        std("Condenspomp", "1 st", P["a_condenspomp"])
+        std("Condenspomp", f"{n_totaal} st" if n_totaal > 1 else "1 st", P["a_condenspomp"] * n_totaal)
     if inp["console"]:
-        std("Muurconsole + trillingsdempers", "1 st", P["a_console"])
+        std("Muurconsole + trillingsdempers", f"{aantal_systemen} st", P["a_console"] * aantal_systemen)
     if inp["elek"]:
-        std("Elektrisch materiaal", "", P["a_elek_mat"])
+        std("Elektrisch materiaal", f"{aantal_systemen} circuit(s)", P["a_elek_mat"] * aantal_systemen)
 
     mat_inkoop = sum(m[2] for m in mat)
     mat_verkoop = sum(m[3] for m in mat)
 
-    uren_auto = (
+    # Uren per systeem (incl. eventuele extra binnenunits binnen dat systeem),
+    # daarna vermenigvuldigd met het aantal aparte systemen — want elk apart
+    # systeem heeft z'n eigen buitenunit-plaatsing nodig, dat is geen "gratis" extra.
+    uren_per_systeem = (
         P["a_uren_basis"]
         + (n - 1) * P["a_uren_extra_unit"]
-        + inp["doorvoeren"] * P["a_uren_doorvoer"]
         + (P["a_uren_elek"] if inp["elek"] else 0)
         + (P["a_uren_pomp"] if inp["condenspomp"] else 0)
     )
+    uren_auto = uren_per_systeem * aantal_systemen + inp["doorvoeren"] * P["a_uren_doorvoer"]
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
     arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
     arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
