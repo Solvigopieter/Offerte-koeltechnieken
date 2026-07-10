@@ -555,21 +555,27 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_text_color(255, 255, 255)
     pdf.set_font(F, "B", 13)
     pdf.set_xy(12, 5)
-    pdf.cell(0, 8, "Algemene voorwaarden")
+    pdf.cell(80, 8, "Algemene voorwaarden")
     pdf.set_font(F, "", 8)
     pdf.set_text_color(*ORANGE)
     pdf.set_xy(150, 7)
-    pdf.cell(0, 5, "P&R KOELTECHNIEKEN")
+    pdf.cell(48, 5, "P&R KOELTECHNIEKEN")
 
-    pdf.set_y(24)
+    # Cursor expliciet terug naar de linkermarge zetten (x én y) — de cellen
+    # hierboven gebruiken een vaste breedte, maar dit is de vangnet-fix zodat
+    # de tekst hierna altijd over de volledige paginabreedte kan starten.
+    pdf.set_xy(12, 24)
     for titel_art, tekst_art in ALGEMENE_VOORWAARDEN:
+        pdf.set_x(12)
         pdf.set_font(F, "B", 8.5)
         pdf.set_text_color(*NAVY)
         pdf.multi_cell(0, 4.2, S(titel_art))
+        pdf.set_x(12)
         pdf.set_font(F, "", 7.8)
         pdf.set_text_color(60, 60, 60)
         pdf.multi_cell(0, 3.9, S(tekst_art))
         pdf.ln(1.5)
+        pdf.set_x(12)
 
     out = pdf.output(dest="S")
     return bytes(out) if isinstance(out, (bytes, bytearray)) else out.encode("latin-1")
