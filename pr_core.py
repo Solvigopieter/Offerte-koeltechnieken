@@ -307,6 +307,79 @@ BEDRIJFSINFO = [
     "info@prkoeltechnieken.be",    # TODO: aanpassen
 ]
 
+# ---------------------------------------------------------------- ALGEMENE VOORWAARDEN
+# Pas gerust aan — dit is een degelijke basis voor een Belgische HVAC-installateur,
+# maar laat ze idealiter nog eens nalezen door je boekhouder of een jurist vóór
+# je ze structureel gebruikt. LET OP: art. 11 (bevoegde rechtbank) invullen!
+ALGEMENE_VOORWAARDEN = [
+    ("Art. 1 — Toepassing",
+     "Deze algemene voorwaarden zijn van toepassing op alle offertes, overeenkomsten, leveringen en werken van "
+     "P&R Koeltechnieken (hierna 'de installateur'). Afwijkingen zijn enkel geldig indien schriftelijk overeengekomen. "
+     "De voorwaarden van de klant zijn niet tegenstelbaar aan de installateur, tenzij uitdrukkelijk schriftelijk aanvaard."),
+
+    ("Art. 2 — Offertes en prijzen",
+     "Offertes zijn geldig tot de vermelde vervaldatum en zijn opgemaakt op basis van de door de klant verstrekte "
+     "informatie. Alle prijzen zijn exclusief BTW tenzij anders vermeld. De installateur behoudt zich het recht voor "
+     "prijzen aan te passen indien de kostprijs van materialen tussen offerte en uitvoering aantoonbaar stijgt met "
+     "meer dan 5%, en dit beperkt tot het gedeelte van de prijs dat betrekking heeft op die materialen. Kennelijke "
+     "vergissingen of schrijffouten in de offerte binden de installateur niet."),
+
+    ("Art. 3 — BTW-tarief",
+     "Bij toepassing van het verlaagd BTW-tarief van 6% verklaart de klant dat de woning ouder is dan 10 jaar, "
+     "hoofdzakelijk als privéwoning wordt gebruikt en dat de werken worden geleverd en gefactureerd aan de "
+     "eindgebruiker. De klant is als enige aansprakelijk voor de juistheid van deze verklaring en vrijwaart de "
+     "installateur voor elke naheffing, boete of interest die uit een onjuiste verklaring voortvloeit."),
+
+    ("Art. 4 — Uitvoering en toegang tot de werf",
+     "Uitvoeringstermijnen zijn indicatief en binden de installateur niet, behoudens uitdrukkelijk anders "
+     "overeengekomen. Vertraging geeft geen recht op schadevergoeding of ontbinding. De klant zorgt voor vrije en "
+     "veilige toegang tot de werf, een werkende elektrische aansluiting en de nodige nutsvoorzieningen. Wachttijden "
+     "of nutteloze verplaatsingen te wijten aan de klant kunnen in regie worden aangerekend."),
+
+    ("Art. 5 — Meerwerken en onvoorziene omstandigheden",
+     "Werken die niet in de offerte zijn opgenomen (o.a. asbestverwijdering, ontoegankelijke leidingtraces, extra "
+     "doorboringen, aanpassingen aan de elektrische installatie, grondwerken) zijn meerwerken. Meerwerken worden "
+     "slechts uitgevoerd na overleg met de klant en worden aangerekend in regie of volgens afzonderlijke prijsopgave."),
+
+    ("Art. 6 — Betaling",
+     "Behoudens andersluidende vermelding zijn facturen betaalbaar binnen 14 kalenderdagen na factuurdatum. De "
+     "installateur kan een voorschot vragen vóór bestelling van de toestellen. Bij niet-betaling op de vervaldag is "
+     "van rechtswege en zonder ingebrekestelling een verwijlintrest verschuldigd conform de wet van 2 augustus 2002 "
+     "betreffende de bestrijding van de betalingsachterstand, evenals een forfaitaire schadevergoeding van 10% van "
+     "het factuurbedrag met een minimum van 125 EUR. Bij consumenten gelden de wettelijke regels inzake eerste "
+     "kosteloze herinnering en maximale vergoedingen (Boek XIX WER)."),
+
+    ("Art. 7 — Eigendomsvoorbehoud",
+     "Geleverde toestellen en materialen blijven eigendom van de installateur tot volledige betaling van de "
+     "hoofdsom, kosten en interesten. Het risico gaat evenwel over op de klant vanaf de levering op de werf."),
+
+    ("Art. 8 — Garantie",
+     "Op toestellen geldt de fabrieksgarantie volgens de voorwaarden van de fabrikant. Voor consumenten geldt "
+     "daarnaast de wettelijke garantie van 2 jaar op consumptiegoederen. Op de uitgevoerde installatiewerken "
+     "verleent de installateur een waarborg van 2 jaar op verborgen gebreken in de uitvoering. De garantie vervalt "
+     "bij foutief gebruik, gebrekkig onderhoud, ingrepen door derden, bevriezing, over- of onderspanning op het "
+     "elektriciteitsnet of externe oorzaken. Periodiek onderhoud volgens de voorschriften van de fabrikant is een "
+     "voorwaarde voor het behoud van de garantie."),
+
+    ("Art. 9 — Aansprakelijkheid",
+     "De aansprakelijkheid van de installateur is beperkt tot de directe schade die het rechtstreeks gevolg is van "
+     "een bewezen fout in de uitvoering, en tot maximaal het bedrag van de betreffende overeenkomst. De installateur "
+     "is niet aansprakelijk voor indirecte schade zoals gebruiksderving, productieverlies of gevolgschade, behoudens "
+     "in geval van opzet of zware fout. Deze beperkingen doen geen afbreuk aan de wettelijke rechten van consumenten."),
+
+    ("Art. 10 — Annulering en klachten",
+     "Bij annulering van de overeenkomst door de klant vóór aanvang van de werken is een forfaitaire vergoeding "
+     "verschuldigd van 15% van het offertebedrag, verhoogd met de kosten van reeds bestelde of geleverde materialen "
+     "die niet kosteloos geretourneerd kunnen worden. Zichtbare gebreken dienen op straffe van verval gemeld te "
+     "worden binnen 8 kalenderdagen na oplevering; verborgen gebreken binnen 2 maanden na ontdekking, telkens per "
+     "aangetekend schrijven of e-mail met ontvangstbevestiging."),
+
+    ("Art. 11 — Toepasselijk recht en bevoegde rechtbank",
+     "Op alle overeenkomsten is uitsluitend het Belgisch recht van toepassing. Geschillen behoren tot de uitsluitende "
+     "bevoegdheid van de rechtbanken van het gerechtelijk arrondissement van de maatschappelijke zetel van de "
+     "installateur, onverminderd dwingende bevoegdheidsregels ten aanzien van consumenten."),
+]
+
 
 def gen_offertenummer(klantnaam: str, d: date) -> str:
     base = re.sub(r"[^A-Za-z0-9]", "", (klantnaam or "").upper())
@@ -410,33 +483,29 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_fill_color(*NAVY)
     pdf.set_text_color(255, 255, 255)
     pdf.set_draw_color(200, 205, 212)
-    pdf.cell(76, 8, "Omschrijving", border=1, fill=True)
-    pdf.cell(28, 8, "Aantal", border=1, align="C", fill=True)
-    pdf.cell(37, 8, "Eenheidsprijs", border=1, align="R", fill=True)
+    pdf.cell(110, 8, "Omschrijving", border=1, fill=True)
+    pdf.cell(35, 8, "Aantal", border=1, align="C", fill=True)
     pdf.cell(41, 8, "Totaal (EUR)", border=1, align="R", fill=True)
     pdf.ln(8)
 
     pdf.set_font(F, "", 9)
     pdf.set_text_color(40, 40, 40)
     fill = False
-    def row(om, aantal, bedrag, eenheidsprijs=None):
+    def row(om, aantal, bedrag):
         nonlocal fill
         pdf.set_fill_color(*(GREY if fill else (255, 255, 255)))
-        pdf.cell(76, 7, S(om)[:48], border=1, fill=True)
-        pdf.cell(28, 7, S(aantal), border=1, align="C", fill=True)
-        eh_txt = f"{eenheidsprijs:,.2f}".replace(",", " ") if eenheidsprijs is not None else "-"
-        pdf.cell(37, 7, eh_txt, border=1, align="R", fill=True)
+        pdf.cell(110, 7, S(om)[:68], border=1, fill=True)
+        pdf.cell(35, 7, S(aantal), border=1, align="C", fill=True)
         pdf.cell(41, 7, f"{bedrag:,.2f}".replace(",", " "), border=1, align="R", fill=True)
         pdf.ln(7)
         fill = not fill
 
     for om, aantal, inkoop, verkoop, eenheid in res["mat"]:
-        row(om, aantal, verkoop, eenheid)
+        row(om, aantal, verkoop)
 
     if res.get("arbeid_aanrekenen", True):
         row(f"Installatie & indienststelling ({res['uren']:.1f} u x {inp['techniekers']} technieker(s))", "", res["arbeid"])
-    else:
-        row("Installatie & indienststelling (inbegrepen in toestelprijs)", "", 0.0)
+    # indien arbeid niet apart aangerekend wordt: geen regel op de offerte
 
     if res["km_kost"] > 0:
         row("Verplaatsing", f"{inp['km']} km", res["km_kost"])
@@ -456,16 +525,51 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     tot_row(f"BTW {int(inp['btw']*100)}%", res["btw_bedrag"])
     tot_row("Totaal incl. BTW", res["totaal"], bold=True, orange=True)
 
-    # --- Voorwaarden ---
+    # --- Verwijzing naar algemene voorwaarden ---
     pdf.ln(6)
     pdf.set_font(F, "", 8)
     pdf.set_text_color(120, 120, 120)
     pdf.multi_cell(0, 4.5, S(
-        "Deze offerte is opgemaakt op basis van de door de klant verstrekte informatie. "
-        "Prijzen zijn geldig tot de vermelde vervaldatum. Meerwerken door onvoorziene omstandigheden "
-        "(bv. asbest, ontoegankelijke leidingtraces, extra doorboringen) worden in regie aangerekend na overleg. "
-        "Opdrachtgever voorziet een vrije en veilige toegang tot de werf en een werkende elektrische aansluiting. "
-        "Bij toepassing van 6% BTW bevestigt de klant dat de woning ouder is dan 10 jaar en hoofdzakelijk privé wordt gebruikt."))
+        "Op deze offerte zijn onze algemene voorwaarden van toepassing (zie volgende pagina). "
+        "Door ondertekening of schriftelijke aanvaarding van deze offerte verklaart de klant "
+        "hiervan kennis te hebben genomen en deze te aanvaarden."))
+
+    # --- Handtekeningvakken ---
+    pdf.ln(8)
+    pdf.set_font(F, "", 9)
+    pdf.set_text_color(*NAVY)
+    y_sig = pdf.get_y()
+    pdf.set_xy(12, y_sig)
+    pdf.cell(90, 5, "Voor akkoord, de klant", ln=0)
+    pdf.set_xy(120, y_sig)
+    pdf.cell(0, 5, "P&R Koeltechnieken", ln=1)
+    pdf.set_font(F, "", 8)
+    pdf.set_text_color(120, 120, 120)
+    pdf.set_xy(12, y_sig + 6)
+    pdf.cell(90, 5, "(datum + handtekening, voorafgegaan door 'gelezen en goedgekeurd')")
+
+    # ================= PAGINA 2: ALGEMENE VOORWAARDEN =================
+    pdf.add_page()
+    pdf.set_fill_color(*NAVY)
+    pdf.rect(0, 0, 210, 18, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font(F, "B", 13)
+    pdf.set_xy(12, 5)
+    pdf.cell(0, 8, "Algemene voorwaarden")
+    pdf.set_font(F, "", 8)
+    pdf.set_text_color(*ORANGE)
+    pdf.set_xy(150, 7)
+    pdf.cell(0, 5, "P&R KOELTECHNIEKEN")
+
+    pdf.set_y(24)
+    for titel_art, tekst_art in ALGEMENE_VOORWAARDEN:
+        pdf.set_font(F, "B", 8.5)
+        pdf.set_text_color(*NAVY)
+        pdf.multi_cell(0, 4.2, S(titel_art))
+        pdf.set_font(F, "", 7.8)
+        pdf.set_text_color(60, 60, 60)
+        pdf.multi_cell(0, 3.9, S(tekst_art))
+        pdf.ln(1.5)
 
     out = pdf.output(dest="S")
     return bytes(out) if isinstance(out, (bytes, bytearray)) else out.encode("latin-1")
