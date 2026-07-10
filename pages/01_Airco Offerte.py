@@ -12,7 +12,7 @@ require_login()
 from datetime import date, timedelta
 import pandas as pd
 
-from pr_core import DEFAULT_PRIJZEN, bereken_airco, maak_pdf, gen_offertenummer
+from pr_core import DEFAULT_PRIJZEN, bereken_airco, maak_pdf, gen_offertenummer, eenheid_label
 from storage import load_prijzen, save_project
 
 P = load_prijzen(DEFAULT_PRIJZEN)
@@ -53,13 +53,23 @@ with c3:
              "Voor 1 buitenunit met 3 binnenunits kies je hierboven 'Multi-split — 3 binnenunits' en laat dit op 1 staan.")
     merk_model = st.text_input("Merk & model (op offerte)", key="a_merk", placeholder="bv. Daikin Perfera 3,5 kW")
 with c4:
-    st.markdown("**Buitenunit**")
-    prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=900.0, step=10.0, key="a_prijs_buiten")
-    prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_buiten_verkoop",
-        help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in als je zelf een vaste verkoopprijs hanteert (bv. Panasonic-catalogusprijs), los van de marge-instelling.")
-    st.markdown("**Binnenunit**")
-    prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
-    prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
+    is_mono = (n_binnen == 1)
+    if is_mono:
+        st.markdown("**Toestel (set binnen + buitenunit)**")
+        prijs_set = st.number_input("Inkoopprijs per set (EUR)", min_value=0.0, value=1100.0, step=10.0, key="a_prijs_set",
+            help="Bij mono-split koop je meestal 1 set (binnen- + buitenunit samen), geen aparte prijzen.")
+        prijs_set_verkoop = st.number_input("Verkoopprijs per set (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_set_verkoop",
+            help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in voor een vaste verkoopprijs, los van de marge-instelling.")
+        prijs_buiten, prijs_buiten_verkoop = prijs_set, prijs_set_verkoop
+        prijs_binnen, prijs_binnen_verkoop = 0.0, 0.0
+    else:
+        st.markdown("**Buitenunit**")
+        prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=900.0, step=10.0, key="a_prijs_buiten")
+        prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_buiten_verkoop",
+            help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in als je zelf een vaste verkoopprijs hanteert (bv. Panasonic-catalogusprijs), los van de marge-instelling.")
+        st.markdown("**Binnenunit**")
+        prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
+        prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
 with c5:
     leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
     goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
@@ -82,7 +92,7 @@ with c8:
     btw = st.selectbox("BTW-tarief", [0.21, 0.06], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="a_btw")
 
 # ================= Berekening =================
-inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, merk_model=merk_model, prijs_buiten=prijs_buiten,
+inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, merk_model=merk_model, prijs_buiten=prijs_buiten,
            prijs_buiten_verkoop=prijs_buiten_verkoop,
            prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
            leiding_m=leiding_m, goot_m=goot_m,
@@ -93,15 +103,19 @@ inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, merk_model=merk_m
 res = bereken_airco(inp, P)
 
 st.subheader("Offerte-opbouw")
-rows = [{"Omschrijving": m[0], "Aantal": m[1], "Eenheidsprijs (EUR)": round(m[4], 2), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
+def _eh(bedrag, unit=""):
+    txt = f"€ {bedrag:,.2f}".replace(",", " ")
+    return f"{txt} {unit}".strip() if unit else txt
+
+rows = [{"Omschrijving": m[0], "Aantal": m[1], "Eenheidsprijs": _eh(m[4], eenheid_label(m[1])), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
 if arbeid_aanrekenen:
-    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
+    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
 else:
-    rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": 0.0})
-rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
-rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["vast"], 2)})
+    rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": 0.0})
+rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
+rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["vast"], 2)})
 if res["extra_hoogte"] > 0:
-    rows.append({"Omschrijving": "Hoogtewerker", "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["extra_hoogte"], 2)})
+    rows.append({"Omschrijving": "Hoogtewerker", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["extra_hoogte"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 m1, m2, m3, m4 = st.columns(4)

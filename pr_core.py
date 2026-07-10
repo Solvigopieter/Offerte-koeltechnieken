@@ -99,6 +99,18 @@ PRIJS_LABELS = {
 
 
 # ================================================================ BEREKENINGEN
+def eenheid_label(aantal_tekst: str) -> str:
+    """Leidt een korte eenheid-suffix af uit de aantal-tekst, voor weergave op
+    het scherm (bv. '20.0 m' -> '/m', '3 st' -> '/st'). Wordt NIET op de PDF
+    gebruikt — daar staat gewoon het bedrag."""
+    if not aantal_tekst:
+        return ""
+    parts = aantal_tekst.strip().split(None, 1)
+    if len(parts) < 2:
+        return ""
+    return f"/{parts[1].strip()}"
+
+
 def _vk(inkoop: float, verkoop_override: float, marge: float) -> float:
     """Verkoopprijs: gebruik de manueel ingegeven verkoopprijs als die is ingevuld
     (> 0), anders automatisch inkoop x marge%. Zo klopt de marge altijd, ook als
@@ -113,16 +125,23 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     aantal_systemen = max(1, inp.get("aantal_systemen", 1))  # aantal aparte buitenunits
     n_totaal = n * aantal_systemen             # totaal aantal binnenunits
 
-    buiten_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
-    buiten_inkoop = inp["prijs_buiten"] * aantal_systemen
-    buiten_verkoop = buiten_eenheid_verkoop * aantal_systemen
-    binnen_eenheid_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge)
-    binnen_inkoop = inp["prijs_binnen"] * n_totaal
-    binnen_verkoop = binnen_eenheid_verkoop * n_totaal
-
     mat = []  # (omschrijving, aantal-tekst, inkoop-totaal, verkoop-totaal, eenheidsprijs-verkoop)
-    mat.append((f"Buitenunit {inp['merk_model']}".strip(), f"{aantal_systemen} st", buiten_inkoop, buiten_verkoop, buiten_eenheid_verkoop))
-    mat.append((f"Binnenunit(s)", f"{n_totaal} st", binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
+
+    if inp.get("mono_set") and n == 1:
+        # Mono-split: 1 aankoopprijs voor het volledige toestel (binnen+buiten samen)
+        set_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
+        set_inkoop = inp["prijs_buiten"] * aantal_systemen
+        set_verkoop = set_eenheid_verkoop * aantal_systemen
+        mat.append((f"Toestel (binnen- + buitenunit) {inp['merk_model']}".strip(), f"{aantal_systemen} st", set_inkoop, set_verkoop, set_eenheid_verkoop))
+    else:
+        buiten_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
+        buiten_inkoop = inp["prijs_buiten"] * aantal_systemen
+        buiten_verkoop = buiten_eenheid_verkoop * aantal_systemen
+        binnen_eenheid_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge)
+        binnen_inkoop = inp["prijs_binnen"] * n_totaal
+        binnen_verkoop = binnen_eenheid_verkoop * n_totaal
+        mat.append((f"Buitenunit {inp['merk_model']}".strip(), f"{aantal_systemen} st", buiten_inkoop, buiten_verkoop, buiten_eenheid_verkoop))
+        mat.append((f"Binnenunit(s)", f"{n_totaal} st", binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
 
     def std(om, aantal, inkoop_totaal, aantal_num=1):
         verkoop_totaal = inkoop_totaal * marge

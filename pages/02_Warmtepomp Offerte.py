@@ -12,7 +12,7 @@ require_login()
 from datetime import date, timedelta
 import pandas as pd
 
-from pr_core import DEFAULT_PRIJZEN, bereken_wp, maak_pdf, gen_offertenummer
+from pr_core import DEFAULT_PRIJZEN, bereken_wp, maak_pdf, gen_offertenummer, eenheid_label
 from storage import load_prijzen, save_project
 
 P = load_prijzen(DEFAULT_PRIJZEN)
@@ -85,13 +85,17 @@ inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp,
 res = bereken_wp(inp, P)
 
 st.subheader("Offerte-opbouw")
-rows = [{"Omschrijving": m[0], "Aantal": m[1], "Eenheidsprijs (EUR)": round(m[4], 2), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
+def _eh(bedrag, unit=""):
+    txt = f"€ {bedrag:,.2f}".replace(",", " ")
+    return f"{txt} {unit}".strip() if unit else txt
+
+rows = [{"Omschrijving": m[0], "Aantal": m[1], "Eenheidsprijs": _eh(m[4], eenheid_label(m[1])), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
 if arbeid_aanrekenen:
-    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
+    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
 else:
-    rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": 0.0})
-rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
-rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs (EUR)": None, "Verkoop totaal (EUR)": round(res["vast"], 2)})
+    rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": 0.0})
+rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
+rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["vast"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 m1, m2, m3, m4 = st.columns(4)
