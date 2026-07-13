@@ -1,4 +1,4 @@
-# pr_core.py — gedeelde prijzen, berekeningen en PDF voor P&R Koeltechnieken
+# pr_core.py — gedeelde prijzen, berekeningen en PDF voor Solvigo Koeltechnieken
 import io
 import os
 import re
@@ -277,9 +277,9 @@ def bereken_wp(inp: dict, P: dict) -> dict:
 
 
 # ================================================================ PDF
-NAVY = (14, 42, 71)
-ORANGE = (242, 140, 40)
-GREY = (244, 246, 248)
+NAVY = (17, 50, 211)      # Solvigo-blauw (uit logo)
+ORANGE = (196, 144, 0)    # Goud/geel-accent, verduisterd voor leesbaarheid op wit
+GREY = (245, 246, 250)
 
 # Tekens die de standaard Helvetica/latin-1 encoding niet aankan (crasht anders de PDF)
 _PDF_REPLACEMENTS = {
@@ -303,12 +303,13 @@ def _safe(text, use_uni: bool) -> str:
     return text.encode("latin-1", "replace").decode("latin-1")
 
 BEDRIJFSINFO = [
-    "P&R Koeltechnieken",
-    "Westerlo",                    # TODO: volledig adres invullen
-    "Tel.: 0471 42 56 69",         # TODO: aanpassen
-    "BTW-nr: BE 0XXX.XXX.XXX",     # TODO: invullen
-    "IBAN: BE00 0000 0000 0000",   # TODO: invullen
-    "info@prkoeltechnieken.be",    # TODO: aanpassen
+    "Solvigo BV",
+    "Baksveld 38, 2260 Westerlo",
+    "Tel.: 0471 42 56 69",
+    "BTW: BE 0677.778.392",
+    "IBAN: BE59 0018 1682 5558",
+    "www.solvigo.be",              # TODO: aanpassen naar definitief website-adres (koeltechnieken)
+    "cleaning@solvigo.be",         # TODO: aanpassen naar definitief e-mailadres (koeltechnieken)
 ]
 
 # ---------------------------------------------------------------- ALGEMENE VOORWAARDEN
@@ -318,7 +319,7 @@ BEDRIJFSINFO = [
 ALGEMENE_VOORWAARDEN = [
     ("Art. 1 — Toepassing",
      "Deze algemene voorwaarden zijn van toepassing op alle offertes, overeenkomsten, leveringen en werken van "
-     "P&R Koeltechnieken (hierna 'de installateur'). Afwijkingen zijn enkel geldig indien schriftelijk overeengekomen. "
+     "Solvigo Koeltechnieken (hierna 'de installateur'). Afwijkingen zijn enkel geldig indien schriftelijk overeengekomen. "
      "De voorwaarden van de klant zijn niet tegenstelbaar aan de installateur, tenzij uitdrukkelijk schriftelijk aanvaard."),
 
     ("Art. 2 — Offertes en prijzen",
@@ -388,7 +389,7 @@ ALGEMENE_VOORWAARDEN = [
 def gen_offertenummer(klantnaam: str, d: date) -> str:
     base = re.sub(r"[^A-Za-z0-9]", "", (klantnaam or "").upper())
     tag = base[:5] if base else "CLIENT"
-    return f"PR-{d:%Y%m%d}-{tag}"
+    return f"SLV-{d:%Y%m%d}-{tag}"
 
 
 def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes:
@@ -408,30 +409,33 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     F = "DejaVu" if use_uni else "Helvetica"
     S = lambda t: _safe(t, use_uni)
 
-    # --- Navy header-balk ---
-    pdf.set_fill_color(*NAVY)
-    pdf.rect(0, 0, 210, 30, "F")
+    # --- Header: logo op witte achtergrond (logo heeft zelf al een witte achtergrond) ---
     logo_ok = False
     for lp in ("assets/logo.png", "Logo.png", "logo.png"):
         if os.path.exists(lp):
             try:
-                pdf.image(lp, x=12, y=5, h=20)
+                pdf.image(lp, x=12, y=6, h=26)
                 logo_ok = True
                 break
             except Exception:
                 pass
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font(F, "B", 18)
-    pdf.set_xy(12 if not logo_ok else 45, 8)
-    pdf.cell(0, 8, "P&R KOELTECHNIEKEN")
+    if not logo_ok:
+        # terugvalpositie indien er (nog) geen logo-bestand aanwezig is
+        pdf.set_text_color(*NAVY)
+        pdf.set_font(F, "B", 18)
+        pdf.set_xy(12, 8)
+        pdf.cell(0, 8, "SOLVIGO KOELTECHNIEKEN")
     pdf.set_font(F, "", 9)
-    pdf.set_xy(12 if not logo_ok else 45, 17)
+    pdf.set_xy(12 if not logo_ok else 70, 16)
     pdf.set_text_color(*ORANGE)
     pdf.cell(0, 5, "AIRCO  ·  WARMTEPOMPEN  ·  KOELTECHNIEK")
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.6)
+    pdf.line(12, 34, 198, 34)
 
     # --- Titel + offertedetails links, bedrijfsinfo rechts ---
     pdf.set_text_color(*NAVY)
-    pdf.set_xy(12, 38)
+    pdf.set_xy(12, 40)
     pdf.set_font(F, "B", 20)
     pdf.cell(0, 10, "Offerte", ln=1)
     pdf.set_font(F, "B", 12)
@@ -547,7 +551,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_xy(12, y_sig)
     pdf.cell(90, 5, "Voor akkoord, de klant", ln=0)
     pdf.set_xy(120, y_sig)
-    pdf.cell(0, 5, "P&R Koeltechnieken", ln=1)
+    pdf.cell(0, 5, "Solvigo Koeltechnieken", ln=1)
     pdf.set_font(F, "", 8)
     pdf.set_text_color(120, 120, 120)
     pdf.set_xy(12, y_sig + 6)
@@ -564,7 +568,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_font(F, "", 8)
     pdf.set_text_color(*ORANGE)
     pdf.set_xy(150, 7)
-    pdf.cell(48, 5, "P&R KOELTECHNIEKEN")
+    pdf.cell(48, 5, "SOLVIGO KOELTECHNIEKEN")
 
     # Cursor expliciet terug naar de linkermarge zetten (x én y) — de cellen
     # hierboven gebruiken een vaste breedte, maar dit is de vangnet-fix zodat

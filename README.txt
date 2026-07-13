@@ -1,4 +1,4 @@
-P&R Koeltechnieken — Offertegenerator
+Solvigo Koeltechnieken — Offertegenerator
 =====================================
 
 Zelfde opzet als de Solvigo offertegenerator, met 3 extra's:
@@ -16,10 +16,12 @@ Structuur
 - pages/02_Warmtepomp Offerte.py
 - pages/03_Projecten.py
 - pages/04_Prijsinstellingen.py
-- assets/logo.png                 → ZET HIER JE P&R LOGO (komt in de PDF-header)
+- assets/logo.png                 → Solvigo Koeltechnieken-logo (staat er al in, komt in de PDF-header)
 
-VOOR JE START: pas in pr_core.py het blok BEDRIJFSINFO aan
-(adres, BTW-nummer, IBAN, e-mail — staat nu met TODO's).
+VOOR JE START: website en e-mailadres in pr_core.py (blok BEDRIJFSINFO) staan nog
+op de tijdelijke Solvigo-waarden (www.solvigo.be / cleaning@solvigo.be) — TODO:
+aanpassen naar de definitieve koeltechnieken-website en het e-mailadres zodra
+die bekend zijn.
 
 Lokaal starten
 --------------
@@ -37,12 +39,12 @@ Online (Streamlit Community Cloud) — met blijvende opslag
 1. Repo op GitHub → Deploy met entrypoint: app.py
 2. Gebruik hetzelfde Google service account als de Solvigo CRM
    (project solvigo-offertes-500821) of maak een nieuw aan.
-3. Maak een Google Sheet aan, bv. "PR Offertes", en deel die met het
+3. Maak een Google Sheet aan, bv. "Koeltechnieken offerte", en deel die met het
    service-account e-mailadres (Editor-rechten).
 4. In Streamlit → Settings → Secrets:
 
     APP_PASSWORD = "JullieSterkWachtwoord123!"
-    PR_SHEET_NAME = "PR Offertes"
+    PR_SHEET_NAME = "Koeltechnieken offerte"
 
     [gcp_service_account]
     type = "service_account"

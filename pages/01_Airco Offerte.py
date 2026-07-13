@@ -2,7 +2,7 @@
 import streamlit as st
 
 try:
-    st.set_page_config(page_title="Airco Offerte — P&R", layout="wide", page_icon="❄️")
+    st.set_page_config(page_title="Airco Offerte — Solvigo", layout="wide", page_icon="❄️")
 except Exception:
     pass
 
@@ -135,7 +135,7 @@ klant = dict(naam=klantnaam, bedrijf=bedrijf, adres=adres, email=email, tel=tel,
              datum=offertedatum, verloop=verloopdatum,
              nummer=gen_offertenummer(klantnaam, offertedatum))
 
-intro = ("Bedankt voor uw vertrouwen in P&R Koeltechnieken. Wij installeren uw airconditioning "
+intro = ("Bedankt voor uw vertrouwen in Solvigo Koeltechnieken. Wij installeren uw airconditioning "
          "vakkundig en volgens de geldende normen, inclusief vacumeren, lektest en indienststelling. "
          "U geniet van koeling in de zomer en zuinige verwarming in de winter.")
 

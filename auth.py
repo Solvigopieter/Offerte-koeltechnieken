@@ -8,7 +8,7 @@ def _password_ok(pw: str) -> bool:
 def require_login():
     if st.session_state.get("auth_ok"):
         return
-    st.markdown("### 🔒 Beveiligde toegang — P&R Koeltechnieken")
+    st.markdown("### 🔒 Beveiligde toegang — Solvigo Koeltechnieken")
     with st.form("login_form", clear_on_submit=False):
         pw = st.text_input("Wachtwoord", type="password")
         ok = st.form_submit_button("Inloggen")

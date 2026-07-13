@@ -2,7 +2,7 @@
 import streamlit as st
 
 try:
-    st.set_page_config(page_title="Prijsinstellingen — P&R", layout="wide", page_icon="⚙️")
+    st.set_page_config(page_title="Prijsinstellingen — Solvigo", layout="wide", page_icon="⚙️")
 except Exception:
     pass
 

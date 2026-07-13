@@ -4,7 +4,7 @@ import json
 import streamlit as st
 
 try:
-    st.set_page_config(page_title="Projecten — P&R", layout="wide", page_icon="📁")
+    st.set_page_config(page_title="Projecten — Solvigo", layout="wide", page_icon="📁")
 except Exception:
     pass
 
