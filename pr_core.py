@@ -409,42 +409,42 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     F = "DejaVu" if use_uni else "Helvetica"
     S = lambda t: _safe(t, use_uni)
 
-    # --- Header: logo op witte achtergrond (logo heeft zelf al een witte achtergrond) ---
+    # --- Header: logo, rustige tagline, dunne scheidingslijn ---
     logo_ok = False
     for lp in ("assets/logo.png", "Logo.png", "logo.png"):
         if os.path.exists(lp):
             try:
-                pdf.image(lp, x=12, y=6, h=26)
+                pdf.image(lp, x=12, y=8, h=22)
                 logo_ok = True
                 break
             except Exception:
                 pass
     if not logo_ok:
-        # terugvalpositie indien er (nog) geen logo-bestand aanwezig is
         pdf.set_text_color(*NAVY)
-        pdf.set_font(F, "B", 18)
-        pdf.set_xy(12, 8)
+        pdf.set_font(F, "B", 16)
+        pdf.set_xy(12, 10)
         pdf.cell(0, 8, "SOLVIGO KOELTECHNIEKEN")
-    pdf.set_font(F, "", 9)
-    pdf.set_xy(12 if not logo_ok else 70, 16)
-    pdf.set_text_color(*ORANGE)
-    pdf.cell(0, 5, "AIRCO  ·  WARMTEPOMPEN  ·  KOELTECHNIEK")
-    pdf.set_draw_color(*NAVY)
-    pdf.set_line_width(0.6)
+    pdf.set_font(F, "", 8)
+    pdf.set_text_color(140, 140, 140)
+    pdf.set_xy(12 if not logo_ok else 65, 17)
+    pdf.cell(0, 5, "AIRCO   ·   WARMTEPOMPEN   ·   KOELTECHNIEK")
+    pdf.set_draw_color(224, 226, 231)
+    pdf.set_line_width(0.3)
     pdf.line(12, 34, 198, 34)
 
     # --- Titel + offertedetails links, bedrijfsinfo rechts ---
     pdf.set_text_color(*NAVY)
     pdf.set_xy(12, 40)
-    pdf.set_font(F, "B", 20)
-    pdf.cell(0, 10, "Offerte", ln=1)
-    pdf.set_font(F, "B", 12)
-    pdf.set_text_color(*ORANGE)
-    pdf.cell(0, 7, S(titel), ln=1)
+    pdf.set_font(F, "B", 18)
+    pdf.cell(0, 9, "Offerte", ln=1)
+    pdf.set_font(F, "", 10.5)
+    pdf.set_text_color(90, 90, 90)
+    pdf.set_x(12)
+    pdf.cell(0, 6, S(titel), ln=1)
 
-    pdf.set_text_color(60, 60, 60)
-    pdf.set_font(F, "", 9)
-    y0 = pdf.get_y() + 2
+    pdf.set_text_color(90, 90, 90)
+    pdf.set_font(F, "", 8.5)
+    y0 = pdf.get_y() + 3
     details = [
         f"Offertenummer: {klant['nummer']}",
         f"Offertedatum: {klant['datum']:%d-%m-%Y}",
@@ -452,17 +452,17 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         f"BTW-tarief: {int(inp['btw']*100)}%",
     ]
     for i, d in enumerate(details):
-        pdf.set_xy(12, y0 + i * 5)
-        pdf.cell(90, 5, S(d))
+        pdf.set_xy(12, y0 + i * 4.6)
+        pdf.cell(90, 4.6, S(d))
     for i, lijn in enumerate(BEDRIJFSINFO):
-        pdf.set_xy(130, y0 + i * 5)
-        pdf.cell(0, 5, S(lijn))
+        pdf.set_xy(130, y0 + i * 4.6)
+        pdf.cell(0, 4.6, S(lijn))
 
     # --- Klant ---
-    pdf.set_y(y0 + max(len(details), len(BEDRIJFSINFO)) * 5 + 6)
-    pdf.set_font(F, "B", 11)
+    pdf.set_y(y0 + max(len(details), len(BEDRIJFSINFO)) * 4.6 + 7)
+    pdf.set_font(F, "B", 9)
     pdf.set_text_color(*NAVY)
-    pdf.cell(0, 7, "Klant", ln=1)
+    pdf.cell(0, 6, "KLANT", ln=1)
     pdf.set_font(F, "", 10)
     pdf.set_text_color(40, 40, 40)
     for veld in ("bedrijf", "naam"):
@@ -478,35 +478,45 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     # --- Intro ---
     pdf.ln(4)
     pdf.set_font(F, "", 9)
-    pdf.set_text_color(60, 60, 60)
+    pdf.set_text_color(90, 90, 90)
     pdf.multi_cell(0, 5, S(intro))
-    pdf.ln(4)
+    pdf.ln(5)
 
-    # --- Kostentabel ---
-    pdf.set_font(F, "B", 11)
-    pdf.set_text_color(*NAVY)
-    pdf.cell(0, 7, "Overzicht", ln=1)
-
+    # --- Kostentabel: rustige lijnenstijl (geen volledig grid, geen felle vlakken) ---
     pdf.set_font(F, "B", 9)
-    pdf.set_fill_color(*NAVY)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_draw_color(200, 205, 212)
-    pdf.cell(110, 8, "Omschrijving", border=1, fill=True)
-    pdf.cell(35, 8, "Aantal", border=1, align="C", fill=True)
-    pdf.cell(41, 8, "Totaal (EUR)", border=1, align="R", fill=True)
-    pdf.ln(8)
+    pdf.set_text_color(*NAVY)
+    pdf.cell(0, 6, "OVERZICHT", ln=1)
+    pdf.ln(1)
 
-    pdf.set_font(F, "", 9)
-    pdf.set_text_color(40, 40, 40)
-    fill = False
+    pdf.set_font(F, "B", 8.5)
+    pdf.set_text_color(120, 120, 120)
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.4)
+    pdf.cell(110, 7, "OMSCHRIJVING")
+    pdf.cell(35, 7, "AANTAL", align="C")
+    pdf.cell(41, 7, "TOTAAL (EUR)", align="R")
+    pdf.ln(7)
+    pdf.set_x(12)
+    pdf.line(12, pdf.get_y(), 198, pdf.get_y())
+    pdf.ln(1.5)
+
+    pdf.set_font(F, "", 9.5)
+    pdf.set_text_color(50, 50, 50)
+    pdf.set_draw_color(230, 232, 236)
+    pdf.set_line_width(0.2)
+    idx = 0
     def row(om, aantal, bedrag):
-        nonlocal fill
-        pdf.set_fill_color(*(GREY if fill else (255, 255, 255)))
-        pdf.cell(110, 7, S(om)[:68], border=1, fill=True)
-        pdf.cell(35, 7, S(aantal), border=1, align="C", fill=True)
-        pdf.cell(41, 7, f"{bedrag:,.2f}".replace(",", " "), border=1, align="R", fill=True)
+        nonlocal idx
+        if idx % 2 == 1:
+            pdf.set_fill_color(*GREY)
+            pdf.rect(12, pdf.get_y(), 186, 7, "F")
+        pdf.cell(110, 7, S(om)[:68])
+        pdf.cell(35, 7, S(aantal), align="C")
+        pdf.cell(41, 7, f"{bedrag:,.2f}".replace(",", " "), align="R")
         pdf.ln(7)
-        fill = not fill
+        pdf.set_x(12)
+        pdf.line(12, pdf.get_y(), 198, pdf.get_y())
+        idx += 1
 
     for om, aantal, inkoop, verkoop, eenheid in res["mat"]:
         row(om, aantal, verkoop)
@@ -524,56 +534,65 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
 
     # --- Totalen ---
     pdf.ln(3)
-    def tot_row(label, bedrag, bold=False, orange=False):
-        pdf.set_font(F, "B" if bold else "", 10 if not bold else 11)
-        pdf.set_text_color(*(ORANGE if orange else NAVY))
-        pdf.cell(145, 7, S(label), align="R")
-        pdf.cell(41, 7, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
+    def tot_row(label, bedrag, bold=False, groot=False):
+        pdf.set_font(F, "B" if bold else "", 12 if groot else 9.5)
+        pdf.set_text_color(*NAVY if bold else (90, 90, 90))
+        pdf.cell(145, 7 if not groot else 9, S(label), align="R")
+        pdf.cell(41, 7 if not groot else 9, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
 
     tot_row("Subtotaal excl. BTW", res["subtotaal"])
     tot_row(f"BTW {int(inp['btw']*100)}%", res["btw_bedrag"])
-    tot_row("Totaal incl. BTW", res["totaal"], bold=True, orange=True)
+    pdf.set_draw_color(*NAVY)
+    pdf.set_line_width(0.4)
+    pdf.line(145, pdf.get_y() + 1, 198, pdf.get_y() + 1)
+    pdf.ln(2.5)
+    tot_row("Totaal incl. BTW", res["totaal"], bold=True, groot=True)
 
     # --- Verwijzing naar algemene voorwaarden ---
-    pdf.ln(6)
+    pdf.ln(5)
     pdf.set_font(F, "", 8)
-    pdf.set_text_color(120, 120, 120)
+    pdf.set_text_color(140, 140, 140)
     pdf.multi_cell(0, 4.5, S(
         "Op deze offerte zijn onze algemene voorwaarden van toepassing (zie volgende pagina). "
         "Door ondertekening of schriftelijke aanvaarding van deze offerte verklaart de klant "
         "hiervan kennis te hebben genomen en deze te aanvaarden."))
 
     # --- Handtekeningvakken ---
-    pdf.ln(8)
+    pdf.ln(9)
+    pdf.set_draw_color(224, 226, 231)
+    pdf.set_line_width(0.3)
+    y_box = pdf.get_y()
+    pdf.line(12, y_box + 16, 90, y_box + 16)
+    pdf.line(120, y_box + 16, 198, y_box + 16)
     pdf.set_font(F, "", 9)
-    pdf.set_text_color(*NAVY)
-    y_sig = pdf.get_y()
-    pdf.set_xy(12, y_sig)
-    pdf.cell(90, 5, "Voor akkoord, de klant", ln=0)
-    pdf.set_xy(120, y_sig)
-    pdf.cell(0, 5, "Solvigo Koeltechnieken", ln=1)
-    pdf.set_font(F, "", 8)
-    pdf.set_text_color(120, 120, 120)
-    pdf.set_xy(12, y_sig + 6)
-    pdf.cell(90, 5, "(datum + handtekening, voorafgegaan door 'gelezen en goedgekeurd')")
+    pdf.set_text_color(90, 90, 90)
+    pdf.set_xy(12, y_box + 18)
+    pdf.cell(78, 5, "Voor akkoord, de klant")
+    pdf.set_xy(120, y_box + 18)
+    pdf.cell(0, 5, "Solvigo Koeltechnieken")
+    pdf.set_font(F, "", 7.5)
+    pdf.set_text_color(150, 150, 150)
+    pdf.set_xy(12, y_box + 23)
+    pdf.cell(78, 4, "(datum + handtekening, voorafgegaan door 'gelezen en goedgekeurd')")
 
     # ================= PAGINA 2: ALGEMENE VOORWAARDEN =================
     pdf.add_page()
-    pdf.set_fill_color(*NAVY)
-    pdf.rect(0, 0, 210, 18, "F")
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font(F, "B", 13)
-    pdf.set_xy(12, 5)
-    pdf.cell(80, 8, "Algemene voorwaarden")
+    pdf.set_font(F, "B", 14)
+    pdf.set_text_color(*NAVY)
+    pdf.set_xy(12, 14)
+    pdf.cell(0, 8, "Algemene voorwaarden")
     pdf.set_font(F, "", 8)
-    pdf.set_text_color(*ORANGE)
-    pdf.set_xy(150, 7)
-    pdf.cell(48, 5, "SOLVIGO KOELTECHNIEKEN")
+    pdf.set_text_color(150, 150, 150)
+    pdf.set_xy(140, 16)
+    pdf.cell(58, 5, "SOLVIGO KOELTECHNIEKEN", align="R")
+    pdf.set_draw_color(224, 226, 231)
+    pdf.set_line_width(0.3)
+    pdf.line(12, 24, 198, 24)
 
     # Cursor expliciet terug naar de linkermarge zetten (x én y) — de cellen
     # hierboven gebruiken een vaste breedte, maar dit is de vangnet-fix zodat
     # de tekst hierna altijd over de volledige paginabreedte kan starten.
-    pdf.set_xy(12, 24)
+    pdf.set_xy(12, 32)
     for titel_art, tekst_art in ALGEMENE_VOORWAARDEN:
         pdf.set_x(12)
         pdf.set_font(F, "B", 8.5)
