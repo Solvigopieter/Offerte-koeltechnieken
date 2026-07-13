@@ -88,6 +88,8 @@ with c8:
     arbeid_aanrekenen = st.checkbox("Arbeid apart aanrekenen", value=True, key="a_arbeid_aanrekenen",
         help="Uitvinken als de installatie al inbegrepen zit in de toestelprijs (bv. bij sommige Panasonic-marges).")
     uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="a_uren", disabled=not arbeid_aanrekenen)
+    dossier_aanrekenen = st.checkbox("Dossier-/opstartkost aanrekenen", value=True, key="a_dossier_aanrekenen",
+        help="Uitvinken om de vaste dossier-/opstartkost weg te laten van deze offerte.")
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="a_km")
     btw = st.selectbox("BTW-tarief", [0.21, 0.06], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="a_btw")
 
@@ -99,7 +101,7 @@ inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono,
            doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
            console=console, elek=elek, hoogtewerker=hoogtewerker,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
-           arbeid_aanrekenen=arbeid_aanrekenen)
+           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen)
 res = bereken_airco(inp, P)
 
 st.subheader("Offerte-opbouw")
@@ -113,7 +115,8 @@ if arbeid_aanrekenen:
 else:
     rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": 0.0})
 rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
-rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["vast"], 2)})
+if dossier_aanrekenen:
+    rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["vast"], 2)})
 if res["extra_hoogte"] > 0:
     rows.append({"Omschrijving": "Hoogtewerker", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["extra_hoogte"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)

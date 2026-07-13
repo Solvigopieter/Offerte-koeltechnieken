@@ -180,8 +180,10 @@ def bereken_airco(inp: dict, P: dict) -> dict:
 
     km_kost = inp["km"] * P["km_prijs"] * 2
     extra = P["a_hoogtewerker"] if inp["hoogtewerker"] else 0.0
+    dossier_aanrekenen = inp.get("dossier_aanrekenen", True)
+    vast = P["vast_dossier"] if dossier_aanrekenen else 0.0
 
-    subtotaal = mat_verkoop + arbeid + km_kost + P["vast_dossier"] + extra
+    subtotaal = mat_verkoop + arbeid + km_kost + vast + extra
     subtotaal = max(subtotaal, P["minimum_tarief"])
     btw = subtotaal * inp["btw"]
     totaal = subtotaal + btw
@@ -193,7 +195,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
         "arbeid_aanrekenen": arbeid_aanrekenen,
-        "km_kost": km_kost, "vast": P["vast_dossier"], "extra_hoogte": extra,
+        "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": extra,
         "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
         "marge": marge,
     }
@@ -253,8 +255,10 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
     arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
     km_kost = inp["km"] * P["km_prijs"] * 2
+    dossier_aanrekenen = inp.get("dossier_aanrekenen", True)
+    vast = P["vast_dossier"] if dossier_aanrekenen else 0.0
 
-    subtotaal = mat_verkoop + arbeid + km_kost + P["vast_dossier"]
+    subtotaal = mat_verkoop + arbeid + km_kost + vast
     subtotaal = max(subtotaal, P["minimum_tarief"])
     btw = subtotaal * inp["btw"]
     totaal = subtotaal + btw
@@ -266,7 +270,7 @@ def bereken_wp(inp: dict, P: dict) -> dict:
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
         "arbeid_aanrekenen": arbeid_aanrekenen,
-        "km_kost": km_kost, "vast": P["vast_dossier"], "extra_hoogte": 0.0,
+        "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": 0.0,
         "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
         "marge": marge,
     }
@@ -509,7 +513,8 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
 
     if res["km_kost"] > 0:
         row("Verplaatsing", f"{inp['km']} km", res["km_kost"])
-    row("Dossier & opstart", "", res["vast"])
+    if res.get("dossier_aanrekenen", True):
+        row("Dossier & opstart", "", res["vast"])
     if res["extra_hoogte"] > 0:
         row("Hoogtewerker / moeilijke toegang", "", res["extra_hoogte"])
 
