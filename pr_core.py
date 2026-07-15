@@ -14,6 +14,7 @@ DEFAULT_PRIJZEN = {
     "loonkost_intern": 38.0,      # interne kostprijs per uur (voor marge-indicatie)
     "loonkost_meetellen": 0.0,    # 1 = loonkost aftrekken van brutomarge, 0 = niet (bv. als je (nog) solo werkt)
     "marge_materiaal_pct": 25.0,  # % marge op inkoop materiaal
+    "panasonic_korting_pct": 30.0,  # jouw dealerkorting t.o.v. Panasonic bruto adviesprijs (voor auto-inkoopprijs)
     "km_prijs": 0.75,             # EUR per km (enkel)
     "vast_dossier": 75.0,         # vast opstart-/dossierbedrag per offerte
     "minimum_tarief": 350.0,      # minimum offertebedrag excl. BTW
@@ -60,6 +61,7 @@ PRIJS_LABELS = {
     "loonkost_intern": "Interne loonkost (EUR/u, voor marge-info)",
     "loonkost_meetellen": "Loonkost aftrekken van brutomarge? (checkbox hieronder)",
     "marge_materiaal_pct": "Marge op materiaal (%)",
+    "panasonic_korting_pct": "Panasonic-kortingspercentage (t.o.v. bruto adviesprijs, voor auto-inkoopprijs)",
     "km_prijs": "Kilometerprijs (EUR/km, enkel)",
     "vast_dossier": "Vast dossier-/opstartbedrag (EUR)",
     "minimum_tarief": "Minimumtarief offerte excl. BTW (EUR)",
@@ -122,12 +124,24 @@ def _vk(inkoop: float, verkoop_override: float, marge: float) -> float:
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
     n = inp["n_binnen"]                       # binnenunits per systeem
-    aantal_systemen = max(1, inp.get("aantal_systemen", 1))  # aantal aparte buitenunits
+    custom_units = inp.get("custom_units") or []  # optioneel: lijst van individueel verschillende toestellen
+
+    if custom_units:
+        aantal_systemen = max(1, len(custom_units))
+    else:
+        aantal_systemen = max(1, inp.get("aantal_systemen", 1))  # aantal aparte buitenunits
     n_totaal = n * aantal_systemen             # totaal aantal binnenunits
 
     mat = []  # (omschrijving, aantal-tekst, inkoop-totaal, verkoop-totaal, eenheidsprijs-verkoop)
 
-    if inp.get("mono_set") and n == 1:
+    if custom_units and inp.get("mono_set") and n == 1:
+        # Elk toestel apart: eigen merk/model, eigen inkoop- en verkoopprijs
+        for u in custom_units:
+            u_inkoop = float(u.get("inkoop") or 0)
+            u_verkoop = _vk(u_inkoop, float(u.get("verkoop") or 0), marge)
+            naam = (u.get("merk_model") or "Toestel").strip() or "Toestel"
+            mat.append((f"Toestel (binnen- + buitenunit) {naam}", "1 st", u_inkoop, u_verkoop, u_verkoop))
+    elif inp.get("mono_set") and n == 1:
         # Mono-split: 1 aankoopprijs voor het volledige toestel (binnen+buiten samen)
         set_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
         set_inkoop = inp["prijs_buiten"] * aantal_systemen
@@ -405,13 +419,6 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_margins(12, 12, 12)
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
-
-    # >>> TIJDELIJKE DEBUG-MARKERING — verwijder dit blok zodra de deploy bevestigd is <<<
-    pdf.set_text_color(255, 0, 0)
-    pdf.set_font("Helvetica", "B", 22)
-    pdf.set_xy(12, 260)
-    pdf.cell(0, 10, "DEBUG-CHECK-V2 (indien u dit ziet, draait de nieuwe code)")
-    # >>> EINDE DEBUG-MARKERING <<<
 
     use_uni = False
     try:
