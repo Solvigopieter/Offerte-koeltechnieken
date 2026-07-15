@@ -73,6 +73,8 @@ with c4:
 with c5:
     leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
     goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
+    goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
+        help="Handig als er maar een klein stukje kabelgoot nodig is — de kost wordt dan meegeteld in 'Klein materiaal & bevestiging' in plaats van als eigen regel op de offerte te verschijnen.")
 
 c6, c7, c8 = st.columns(3)
 with c6:
@@ -97,7 +99,7 @@ with c8:
 inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, merk_model=merk_model, prijs_buiten=prijs_buiten,
            prijs_buiten_verkoop=prijs_buiten_verkoop,
            prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
-           leiding_m=leiding_m, goot_m=goot_m,
+           leiding_m=leiding_m, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
            doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
            console=console, elek=elek, hoogtewerker=hoogtewerker,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,

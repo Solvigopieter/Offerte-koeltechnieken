@@ -149,9 +149,17 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         mat.append((om, aantal, inkoop_totaal, verkoop_totaal, eenheid))
 
     std("Koelleidingen (geïsoleerd)", f"{inp['leiding_m']} m", inp["leiding_m"] * P["a_leiding_pm"], aantal_num=inp["leiding_m"] or 1)
-    if inp["goot_m"] > 0:
-        std("Sierlijst / leidinggoot", f"{inp['goot_m']} m", inp["goot_m"] * P["a_goot_pm"], aantal_num=inp["goot_m"])
-    std("Klein materiaal & bevestiging", "", P["a_klein_basis"] * aantal_systemen + n_totaal * P["a_klein_per_unit"])
+
+    goot_inkoop = inp["goot_m"] * P["a_goot_pm"]
+    goot_bij_klein = inp.get("goot_bij_klein", False)
+    if inp["goot_m"] > 0 and not goot_bij_klein:
+        std("Sierlijst / leidinggoot", f"{inp['goot_m']} m", goot_inkoop, aantal_num=inp["goot_m"])
+
+    klein_inkoop = P["a_klein_basis"] * aantal_systemen + n_totaal * P["a_klein_per_unit"]
+    if inp["goot_m"] > 0 and goot_bij_klein:
+        klein_inkoop += goot_inkoop
+    std("Klein materiaal & bevestiging", "", klein_inkoop)
+
     if inp["koelmiddel_m"] > 0:
         std("Extra koelmiddel R32", f"{inp['koelmiddel_m']} m", inp["koelmiddel_m"] * P["a_koelmiddel_pm"], aantal_num=inp["koelmiddel_m"])
     if inp["condenspomp"]:
@@ -397,6 +405,13 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_margins(12, 12, 12)
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
+
+    # >>> TIJDELIJKE DEBUG-MARKERING — verwijder dit blok zodra de deploy bevestigd is <<<
+    pdf.set_text_color(255, 0, 0)
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_xy(12, 260)
+    pdf.cell(0, 10, "DEBUG-CHECK-V2 (indien u dit ziet, draait de nieuwe code)")
+    # >>> EINDE DEBUG-MARKERING <<<
 
     use_uni = False
     try:
