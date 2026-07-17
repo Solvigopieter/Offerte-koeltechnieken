@@ -217,11 +217,11 @@ if verschillende_toestellen:
 
         st.button("↳ Toevoegen aan tabel", key="a_cat_add_btn", on_click=_voeg_toe)
 
-    default_rows = pd.DataFrame([
-        {"Merk & model": "bv. Daikin Perfera 2,5 kW", "Inkoopprijs (EUR)": 950.0, "Verkoopprijs (EUR, 0=auto)": 0.0},
-        {"Merk & model": "bv. Daikin Perfera 3,5 kW", "Inkoopprijs (EUR)": 1100.0, "Verkoopprijs (EUR, 0=auto)": 0.0},
-        {"Merk & model": "bv. Daikin Perfera 5,0 kW", "Inkoopprijs (EUR)": 1450.0, "Verkoopprijs (EUR, 0=auto)": 0.0},
-    ])
+    default_rows = pd.DataFrame({
+        "Merk & model": pd.Series(dtype="str"),
+        "Inkoopprijs (EUR)": pd.Series(dtype="float"),
+        "Verkoopprijs (EUR, 0=auto)": pd.Series(dtype="float"),
+    })
     edited = st.data_editor(
         st.session_state.get("a_units_df", default_rows),
         num_rows="dynamic", use_container_width=True, key="a_units_editor",
@@ -232,17 +232,17 @@ if verschillende_toestellen:
     )
     st.session_state["a_units_df"] = edited
     for _, row in edited.iterrows():
-        naam = str(row.get("Merk & model") or "").strip()
-        inkoop = row.get("Inkoopprijs (EUR)") or 0
-        if naam or inkoop:
-            custom_units.append({
-                "merk_model": naam,
-                "inkoop": float(inkoop or 0),
-                "verkoop": float(row.get("Verkoopprijs (EUR, 0=auto)") or 0),
-            })
+        naam_ruw = row.get("Merk & model")
+        naam = "" if pd.isna(naam_ruw) else str(naam_ruw).strip()
+        inkoop_ruw = row.get("Inkoopprijs (EUR)")
+        inkoop = 0.0 if pd.isna(inkoop_ruw) else float(inkoop_ruw)
+        verkoop_ruw = row.get("Verkoopprijs (EUR, 0=auto)")
+        verkoop = 0.0 if pd.isna(verkoop_ruw) else float(verkoop_ruw)
+        if naam or inkoop > 0:
+            custom_units.append({"merk_model": naam, "inkoop": inkoop, "verkoop": verkoop})
     aantal_systemen = max(1, len(custom_units))
     if not custom_units:
-        st.warning("Vul minstens één toestel in de tabel hierboven in.")
+        st.warning("Vul minstens één toestel in de tabel hierboven in, of voeg er een toe uit de catalogus.")
 
 c6, c7, c8 = st.columns(3)
 with c6:
