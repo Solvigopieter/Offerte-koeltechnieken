@@ -133,6 +133,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     n_totaal = n * aantal_systemen             # totaal aantal binnenunits
 
     mat = []  # (omschrijving, aantal-tekst, inkoop-totaal, verkoop-totaal, eenheidsprijs-verkoop)
+    toestel_verkoop = 0.0  # enkel het toestel zelf (binnen+buitenunit(s)) — hierop wordt de korting toegepast
 
     if custom_units and inp.get("mono_set") and n == 1:
         # Elk toestel apart: eigen merk/model, eigen inkoop- en verkoopprijs
@@ -141,12 +142,14 @@ def bereken_airco(inp: dict, P: dict) -> dict:
             u_verkoop = _vk(u_inkoop, float(u.get("verkoop") or 0), marge)
             naam = (u.get("merk_model") or "Toestel").strip() or "Toestel"
             mat.append((f"Toestel (binnen- + buitenunit) {naam}", "1 st", u_inkoop, u_verkoop, u_verkoop))
+            toestel_verkoop += u_verkoop
     elif inp.get("mono_set") and n == 1:
         # Mono-split: 1 aankoopprijs voor het volledige toestel (binnen+buiten samen)
         set_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
         set_inkoop = inp["prijs_buiten"] * aantal_systemen
         set_verkoop = set_eenheid_verkoop * aantal_systemen
         mat.append((f"Toestel (binnen- + buitenunit) {inp['merk_model']}".strip(), f"{aantal_systemen} st", set_inkoop, set_verkoop, set_eenheid_verkoop))
+        toestel_verkoop += set_verkoop
     else:
         buiten_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
         buiten_inkoop = inp["prijs_buiten"] * aantal_systemen
@@ -156,6 +159,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         binnen_verkoop = binnen_eenheid_verkoop * n_totaal
         mat.append((f"Buitenunit {inp['merk_model']}".strip(), f"{aantal_systemen} st", buiten_inkoop, buiten_verkoop, buiten_eenheid_verkoop))
         mat.append((f"Binnenunit(s)", f"{n_totaal} st", binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
+        toestel_verkoop += buiten_verkoop + binnen_verkoop
 
     def std(om, aantal, inkoop_totaal, aantal_num=1):
         verkoop_totaal = inkoop_totaal * marge
@@ -207,14 +211,15 @@ def bereken_airco(inp: dict, P: dict) -> dict:
 
     subtotaal_voor_korting = mat_verkoop + arbeid + km_kost + vast + extra
 
-    # Korting (bv. familiekorting of volumekorting bij meerdere toestellen)
+    # Korting (bv. familiekorting of volumekorting) — geldt enkel op het toestel zelf,
+    # niet op leidingen/klein materiaal/arbeid/verplaatsing e.d.
     korting_type = inp.get("korting_type", "geen")   # "geen" | "pct" | "vast"
     korting_waarde = float(inp.get("korting_waarde", 0) or 0)
     korting_label = (inp.get("korting_label") or "Korting").strip() or "Korting"
     if korting_type == "pct" and korting_waarde > 0:
-        korting_bedrag = subtotaal_voor_korting * korting_waarde / 100.0
+        korting_bedrag = toestel_verkoop * korting_waarde / 100.0
     elif korting_type == "vast" and korting_waarde > 0:
-        korting_bedrag = min(korting_waarde, subtotaal_voor_korting)
+        korting_bedrag = min(korting_waarde, toestel_verkoop)
     else:
         korting_bedrag = 0.0
 
@@ -301,9 +306,9 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     korting_waarde = float(inp.get("korting_waarde", 0) or 0)
     korting_label = (inp.get("korting_label") or "Korting").strip() or "Korting"
     if korting_type == "pct" and korting_waarde > 0:
-        korting_bedrag = subtotaal_voor_korting * korting_waarde / 100.0
+        korting_bedrag = wp_verkoop * korting_waarde / 100.0
     elif korting_type == "vast" and korting_waarde > 0:
-        korting_bedrag = min(korting_waarde, subtotaal_voor_korting)
+        korting_bedrag = min(korting_waarde, wp_verkoop)
     else:
         korting_bedrag = 0.0
 
