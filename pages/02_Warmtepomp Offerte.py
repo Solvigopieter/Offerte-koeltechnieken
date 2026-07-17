@@ -22,7 +22,7 @@ st.title("🔥 Lucht-water Warmtepomp Offerte")
 loaded = st.session_state.pop("load_project", None)
 if loaded and loaded.get("_type") == "wp":
     for k, v in loaded.items():
-        if not k.startswith("_"):
+        if not k.startswith("_") and not k.endswith("_btn"):
             st.session_state[f"w_{k}"] = v
     st.success("Project geladen — pas aan waar nodig.")
 
@@ -147,7 +147,8 @@ with b1:
 with b2:
     if st.button("💾 Project bewaren", use_container_width=True):
         payload = {k.replace("w_", "", 1): v for k, v in st.session_state.items()
-                   if k.startswith("w_") and isinstance(v, (str, int, float, bool))}
+                   if k.startswith("w_") and not k.endswith("_btn")
+                   and isinstance(v, (str, int, float, bool))}
         payload["_type"] = "wp"
         pid = save_project("Warmtepomp", klantnaam or bedrijf, res["totaal"], payload)
         st.success(f"Bewaard als project {pid} — terug te vinden onder **Projecten**.")

@@ -24,7 +24,7 @@ st.title("❄️ Airco Offerte")
 loaded = st.session_state.pop("load_project", None)
 if loaded and loaded.get("_type") == "airco":
     for k, v in loaded.items():
-        if not k.startswith("_"):
+        if not k.startswith("_") and not k.endswith("_btn"):
             st.session_state[f"a_{k}"] = v
     st.success("Project geladen — pas aan waar nodig.")
 
@@ -336,8 +336,11 @@ with b1:
 
 with b2:
     if st.button("💾 Project bewaren", use_container_width=True):
+        # Knoppen (eindigen op _btn) en andere widget-interne/niet-scalaire status
+        # mogen NOOIT herladen worden in st.session_state — dat geeft een Streamlit-fout.
         payload = {k.replace("a_", "", 1): v for k, v in st.session_state.items()
-                   if k.startswith("a_") and isinstance(v, (str, int, float, bool))}
+                   if k.startswith("a_") and not k.endswith("_btn")
+                   and isinstance(v, (str, int, float, bool))}
         payload["_type"] = "airco"
         pid = save_project("Airco", klantnaam or bedrijf, res["totaal"], payload)
         st.success(f"Bewaard als project {pid} — terug te vinden onder **Projecten**.")
