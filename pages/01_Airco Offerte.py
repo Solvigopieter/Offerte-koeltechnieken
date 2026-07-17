@@ -94,73 +94,117 @@ with c5:
     goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
         help="Handig als er maar een klein stukje kabelgoot nodig is — de kost wordt dan meegeteld in 'Klein materiaal & bevestiging' in plaats van als eigen regel op de offerte te verschijnen.")
 
-korting_pct = P.get("panasonic_korting_pct", 30.0)
+korting_pct = P.get("panasonic_korting_pct", 40.0)
 
 
-def _cat_prijs_str(prijs):
-    inkoop_schat = round(prijs * (1 - korting_pct / 100), 2)
-    return inkoop_schat
+def _inkoop_schatting(prijs):
+    return round(prijs * (1 - korting_pct / 100), 2)
+
+
+def _fmt_eur(x):
+    return f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def mono_picker(prefix):
+    """Getrapte keuze uit MONO_SETS: familie -> kleur -> vermogen. Geeft gekozen item terug."""
+    families = sorted(set(x[0] for x in cat.MONO_SETS))
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        fam = st.selectbox("Model", families, key=f"{prefix}_fam")
+    subset = [x for x in cat.MONO_SETS if x[0] == fam]
+    kleuren = sorted(set(x[1] for x in subset if x[1]))
+    if kleuren:
+        with k2:
+            kleur = st.selectbox("Kleur", kleuren, key=f"{prefix}_kleur")
+        subset = [x for x in subset if x[1] == kleur]
+    else:
+        with k2:
+            st.selectbox("Kleur", ["—"], key=f"{prefix}_kleur_x", disabled=True)
+    with k3:
+        vermogens = sorted(set(x[2] for x in subset))
+        kw = st.selectbox("Vermogen (kW)", vermogens, key=f"{prefix}_kw")
+    item = [x for x in subset if x[2] == kw][0]
+    st.info(f"**{cat.mono_naam(item)}** — adviesprijs {_fmt_eur(item[3])} · geschatte inkoop (−{korting_pct:.0f}%): {_fmt_eur(_inkoop_schatting(item[3]))}")
+    return item
 
 
 # ================= Panasonic-catalogus: automatische prijsinvulling =================
 if not verschillende_toestellen:
     with st.expander("📋 Kies toestel uit Panasonic-catalogus (vult prijs & merk/model automatisch in)"):
         if is_mono:
-            opties = sorted(cat.MONO_SETS, key=lambda x: (x[0], x[2]))
-            keuze = st.selectbox("Toestel (set binnen+buiten)", opties, format_func=cat.mono_label, key="a_cat_mono")
+            item = mono_picker("a_cat_mono")
 
-            def _vul_mono():
-                _, _, _, prijs = st.session_state["a_cat_mono"]
-                st.session_state["a_merk"] = cat.mono_naam(st.session_state["a_cat_mono"])
-                st.session_state["a_prijs_set"] = _cat_prijs_str(prijs)
-                st.session_state["a_prijs_set_verkoop"] = float(prijs)
+            def _vul_mono(gekozen=None):
+                st.session_state["a_merk"] = cat.mono_naam(st.session_state["_a_cat_mono_item"])
+                st.session_state["a_prijs_set"] = _inkoop_schatting(st.session_state["_a_cat_mono_item"][3])
+                st.session_state["a_prijs_set_verkoop"] = float(st.session_state["_a_cat_mono_item"][3])
 
+            st.session_state["_a_cat_mono_item"] = item
             st.button("↳ Vul deze prijs in", key="a_cat_mono_btn", on_click=_vul_mono)
-            st.caption(f"Inkoopprijs wordt geschat met {korting_pct:.0f}% korting t.o.v. de Panasonic-adviesprijs "
-                       f"(instelbaar bij Prijsinstellingen). Verkoopprijs = Panasonic-adviesprijs, zelf aan te passen.")
         else:
-            cb1, cb2 = st.columns(2)
-            with cb1:
-                st.markdown("**Buitenunit**")
-                buiten_opties = sorted(cat.MULTI_BUITEN, key=lambda x: (x[0], x[3]))
-                keuze_b = st.selectbox("Buitenunit", buiten_opties, format_func=cat.buiten_label, key="a_cat_buiten")
+            st.markdown("**Buitenunit**")
+            b1, b2 = st.columns(2)
+            with b1:
+                buiten_fams = sorted(set(x[0] for x in cat.MULTI_BUITEN))
+                bfam = st.selectbox("Systeem", buiten_fams, key="a_cat_bfam")
+            with b2:
+                buiten_subset = [x for x in cat.MULTI_BUITEN if x[0] == bfam]
+                bmodel = st.selectbox("Buitenunit", buiten_subset,
+                    format_func=lambda x: f"{x[1]} ({x[2]}) — {_fmt_eur(x[3])}", key="a_cat_bmodel")
+            st.session_state["_a_cat_buiten_item"] = bmodel
 
-                def _vul_buiten():
-                    _, _, _, prijs = st.session_state["a_cat_buiten"]
-                    st.session_state["a_merk"] = cat.buiten_naam(st.session_state["a_cat_buiten"])
-                    st.session_state["a_prijs_buiten"] = _cat_prijs_str(prijs)
-                    st.session_state["a_prijs_buiten_verkoop"] = float(prijs)
+            def _vul_buiten():
+                it = st.session_state["_a_cat_buiten_item"]
+                st.session_state["a_merk"] = cat.buiten_naam(it)
+                st.session_state["a_prijs_buiten"] = _inkoop_schatting(it[3])
+                st.session_state["a_prijs_buiten_verkoop"] = float(it[3])
 
-                st.button("↳ Vul buitenunit-prijs in", key="a_cat_buiten_btn", on_click=_vul_buiten)
-            with cb2:
-                st.markdown("**Binnenunit** (prijs geldt per stuk)")
-                binnen_opties = sorted(cat.MULTI_BINNEN, key=lambda x: (x[0], x[2]))
-                keuze_i = st.selectbox("Binnenunit", binnen_opties, format_func=cat.binnen_label, key="a_cat_binnen")
+            st.button("↳ Vul buitenunit-prijs in", key="a_cat_buiten_btn", on_click=_vul_buiten)
 
-                def _vul_binnen():
-                    _, _, _, prijs = st.session_state["a_cat_binnen"]
-                    st.session_state["a_prijs_binnen"] = _cat_prijs_str(prijs)
-                    st.session_state["a_prijs_binnen_verkoop"] = float(prijs)
+            st.markdown("**Binnenunit** (prijs per stuk)")
+            i1, i2, i3 = st.columns(3)
+            with i1:
+                binnen_fams = sorted(set(x[0] for x in cat.MULTI_BINNEN))
+                ifam = st.selectbox("Type", binnen_fams, key="a_cat_ifam")
+            binnen_subset = [x for x in cat.MULTI_BINNEN if x[0] == ifam]
+            ikleuren = sorted(set(x[1] for x in binnen_subset if x[1]))
+            if ikleuren:
+                with i2:
+                    ikleur = st.selectbox("Kleur", ikleuren, key="a_cat_ikleur")
+                binnen_subset = [x for x in binnen_subset if x[1] == ikleur]
+            else:
+                with i2:
+                    st.selectbox("Kleur", ["—"], key="a_cat_ikleur_x", disabled=True)
+            with i3:
+                ivermogens = sorted(set(x[2] for x in binnen_subset))
+                ikw = st.selectbox("Vermogen (kW)", ivermogens, key="a_cat_ikw")
+            binnen_item = [x for x in binnen_subset if x[2] == ikw][0]
+            st.info(f"**{cat.binnen_naam(binnen_item)}** — adviesprijs {_fmt_eur(binnen_item[3])} · geschatte inkoop: {_fmt_eur(_inkoop_schatting(binnen_item[3]))}")
+            st.session_state["_a_cat_binnen_item"] = binnen_item
 
-                st.button("↳ Vul binnenunit-prijs in", key="a_cat_binnen_btn", on_click=_vul_binnen)
-            st.caption(f"Inkoopprijzen worden geschat met {korting_pct:.0f}% korting t.o.v. de Panasonic-adviesprijs "
-                       f"(instelbaar bij Prijsinstellingen). Verkoopprijzen = Panasonic-adviesprijs, zelf aan te passen.")
+            def _vul_binnen():
+                it = st.session_state["_a_cat_binnen_item"]
+                st.session_state["a_prijs_binnen"] = _inkoop_schatting(it[3])
+                st.session_state["a_prijs_binnen_verkoop"] = float(it[3])
+
+            st.button("↳ Vul binnenunit-prijs in", key="a_cat_binnen_btn", on_click=_vul_binnen)
+        st.caption(f"Inkoopprijs = adviesprijs × {(100-korting_pct)/100:.2f} ({korting_pct:.0f}% dealerkorting — instelbaar bij Prijsinstellingen). "
+                   f"Verkoopprijs = Panasonic-adviesprijs, zelf aan te passen.")
 
 custom_units = []
 if verschillende_toestellen:
     st.markdown("**Toestellen — elk apart merk, model en prijs**")
 
     with st.expander("📋 Toestel uit Panasonic-catalogus toevoegen aan de tabel"):
-        opties = sorted(cat.MONO_SETS, key=lambda x: (x[0], x[2]))
-        keuze_add = st.selectbox("Toestel (set binnen+buiten)", opties, format_func=cat.mono_label, key="a_cat_add")
+        item_add = mono_picker("a_cat_add")
+        st.session_state["_a_cat_add_item"] = item_add
         aantal_add = st.number_input("Aantal van dit toestel toevoegen", min_value=1, value=1, step=1, key="a_cat_add_n")
 
         def _voeg_toe():
-            _, _, _, prijs = st.session_state["a_cat_add"]
-            naam = cat.mono_naam(st.session_state["a_cat_add"])
-            inkoop_schat = _cat_prijs_str(prijs)
+            it = st.session_state["_a_cat_add_item"]
+            naam = cat.mono_naam(it)
             nieuwe_rijen = pd.DataFrame([
-                {"Merk & model": naam, "Inkoopprijs (EUR)": inkoop_schat, "Verkoopprijs (EUR, 0=auto)": float(prijs)}
+                {"Merk & model": naam, "Inkoopprijs (EUR)": _inkoop_schatting(it[3]), "Verkoopprijs (EUR, 0=auto)": float(it[3])}
                 for _ in range(int(st.session_state["a_cat_add_n"]))
             ])
             bestaand = st.session_state.get("a_units_df")
@@ -219,6 +263,21 @@ with c8:
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="a_km")
     btw = st.selectbox("BTW-tarief", [0.21, 0.06], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="a_btw")
 
+# ================= Korting =================
+with st.expander("💶 Korting geven (bv. familie- of volumekorting)"):
+    kc1, kc2, kc3 = st.columns(3)
+    with kc1:
+        korting_keuze = st.selectbox("Type korting", ["Geen korting", "Percentage (%)", "Vast bedrag (EUR)"], key="a_korting_type")
+    with kc2:
+        korting_waarde = st.number_input("Waarde", min_value=0.0, value=0.0, step=1.0, key="a_korting_waarde",
+            help="Bij percentage: bv. 5 = 5% op het subtotaal. Bij vast bedrag: bedrag in EUR excl. BTW.",
+            disabled=(korting_keuze == "Geen korting"))
+    with kc3:
+        korting_label = st.text_input("Omschrijving op offerte", value="Korting", key="a_korting_label",
+            help="Bv. 'Familiekorting' of 'Volumekorting 3 toestellen' — zo verschijnt het op de PDF.",
+            disabled=(korting_keuze == "Geen korting"))
+korting_type = {"Geen korting": "geen", "Percentage (%)": "pct", "Vast bedrag (EUR)": "vast"}[korting_keuze]
+
 # ================= Berekening =================
 inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, custom_units=custom_units, merk_model=merk_model, prijs_buiten=prijs_buiten,
            prijs_buiten_verkoop=prijs_buiten_verkoop,
@@ -227,7 +286,8 @@ inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono,
            doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
            console=console, elek=elek, hoogtewerker=hoogtewerker,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
-           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen)
+           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
+           korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
 res = bereken_airco(inp, P)
 
 st.subheader("Offerte-opbouw")
@@ -245,6 +305,8 @@ if dossier_aanrekenen:
     rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["vast"], 2)})
 if res["extra_hoogte"] > 0:
     rows.append({"Omschrijving": "Hoogtewerker", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["extra_hoogte"], 2)})
+if res.get("korting_bedrag", 0) > 0:
+    rows.append({"Omschrijving": f"Korting — {res['korting_label']}", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": -round(res["korting_bedrag"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 m1, m2, m3, m4 = st.columns(4)

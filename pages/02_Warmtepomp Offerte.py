@@ -77,13 +77,29 @@ with c8:
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="w_km")
     btw = st.selectbox("BTW-tarief", [0.06, 0.21], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="w_btw")
 
+# ================= Korting =================
+with st.expander("💶 Korting geven (bv. familie- of volumekorting)"):
+    kc1, kc2, kc3 = st.columns(3)
+    with kc1:
+        korting_keuze = st.selectbox("Type korting", ["Geen korting", "Percentage (%)", "Vast bedrag (EUR)"], key="w_korting_type")
+    with kc2:
+        korting_waarde = st.number_input("Waarde", min_value=0.0, value=0.0, step=1.0, key="w_korting_waarde",
+            help="Bij percentage: bv. 5 = 5% op het subtotaal. Bij vast bedrag: bedrag in EUR excl. BTW.",
+            disabled=(korting_keuze == "Geen korting"))
+    with kc3:
+        korting_label = st.text_input("Omschrijving op offerte", value="Korting", key="w_korting_label",
+            help="Bv. 'Familiekorting' — zo verschijnt het op de PDF.",
+            disabled=(korting_keuze == "Geen korting"))
+korting_type = {"Geen korting": "geen", "Percentage (%)": "pct", "Vast bedrag (EUR)": "vast"}[korting_keuze]
+
 # ================= Berekening =================
 inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp,
            prijs_wp_verkoop=prijs_wp_verkoop, afgifte=afgifte,
            buffer=buffer, boiler=boiler, hydro=hydro, elek=elek, sokkel=sokkel,
            afvoer_oud=afvoer_oud, regeling=regeling,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
-           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen)
+           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
+           korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
 res = bereken_wp(inp, P)
 
 st.subheader("Offerte-opbouw")
@@ -99,6 +115,8 @@ else:
 rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
 if dossier_aanrekenen:
     rows.append({"Omschrijving": "Dossier & opstart", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["vast"], 2)})
+if res.get("korting_bedrag", 0) > 0:
+    rows.append({"Omschrijving": f"Korting — {res['korting_label']}", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": -round(res["korting_bedrag"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 m1, m2, m3, m4 = st.columns(4)

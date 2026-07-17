@@ -14,7 +14,7 @@ DEFAULT_PRIJZEN = {
     "loonkost_intern": 38.0,      # interne kostprijs per uur (voor marge-indicatie)
     "loonkost_meetellen": 0.0,    # 1 = loonkost aftrekken van brutomarge, 0 = niet (bv. als je (nog) solo werkt)
     "marge_materiaal_pct": 25.0,  # % marge op inkoop materiaal
-    "panasonic_korting_pct": 30.0,  # jouw dealerkorting t.o.v. Panasonic bruto adviesprijs (voor auto-inkoopprijs)
+    "panasonic_korting_pct": 40.0,  # jouw dealerkorting t.o.v. Panasonic bruto adviesprijs (inkoop = adviesprijs x 0,6)
     "km_prijs": 0.75,             # EUR per km (enkel)
     "vast_dossier": 75.0,         # vast opstart-/dossierbedrag per offerte
     "minimum_tarief": 350.0,      # minimum offertebedrag excl. BTW
@@ -205,7 +205,20 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     dossier_aanrekenen = inp.get("dossier_aanrekenen", True)
     vast = P["vast_dossier"] if dossier_aanrekenen else 0.0
 
-    subtotaal = mat_verkoop + arbeid + km_kost + vast + extra
+    subtotaal_voor_korting = mat_verkoop + arbeid + km_kost + vast + extra
+
+    # Korting (bv. familiekorting of volumekorting bij meerdere toestellen)
+    korting_type = inp.get("korting_type", "geen")   # "geen" | "pct" | "vast"
+    korting_waarde = float(inp.get("korting_waarde", 0) or 0)
+    korting_label = (inp.get("korting_label") or "Korting").strip() or "Korting"
+    if korting_type == "pct" and korting_waarde > 0:
+        korting_bedrag = subtotaal_voor_korting * korting_waarde / 100.0
+    elif korting_type == "vast" and korting_waarde > 0:
+        korting_bedrag = min(korting_waarde, subtotaal_voor_korting)
+    else:
+        korting_bedrag = 0.0
+
+    subtotaal = subtotaal_voor_korting - korting_bedrag
     subtotaal = max(subtotaal, P["minimum_tarief"])
     btw = subtotaal * inp["btw"]
     totaal = subtotaal + btw
@@ -218,6 +231,8 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
         "arbeid_aanrekenen": arbeid_aanrekenen,
         "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": extra,
+        "subtotaal_voor_korting": subtotaal_voor_korting,
+        "korting_bedrag": korting_bedrag, "korting_label": korting_label,
         "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
         "marge": marge,
     }
@@ -280,7 +295,19 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     dossier_aanrekenen = inp.get("dossier_aanrekenen", True)
     vast = P["vast_dossier"] if dossier_aanrekenen else 0.0
 
-    subtotaal = mat_verkoop + arbeid + km_kost + vast
+    subtotaal_voor_korting = mat_verkoop + arbeid + km_kost + vast
+
+    korting_type = inp.get("korting_type", "geen")
+    korting_waarde = float(inp.get("korting_waarde", 0) or 0)
+    korting_label = (inp.get("korting_label") or "Korting").strip() or "Korting"
+    if korting_type == "pct" and korting_waarde > 0:
+        korting_bedrag = subtotaal_voor_korting * korting_waarde / 100.0
+    elif korting_type == "vast" and korting_waarde > 0:
+        korting_bedrag = min(korting_waarde, subtotaal_voor_korting)
+    else:
+        korting_bedrag = 0.0
+
+    subtotaal = subtotaal_voor_korting - korting_bedrag
     subtotaal = max(subtotaal, P["minimum_tarief"])
     btw = subtotaal * inp["btw"]
     totaal = subtotaal + btw
@@ -293,6 +320,8 @@ def bereken_wp(inp: dict, P: dict) -> dict:
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
         "arbeid_aanrekenen": arbeid_aanrekenen,
         "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": 0.0,
+        "subtotaal_voor_korting": subtotaal_voor_korting,
+        "korting_bedrag": korting_bedrag, "korting_label": korting_label,
         "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
         "marge": marge,
     }
@@ -562,6 +591,9 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         pdf.cell(145, 7 if not groot else 9, S(label), align="R")
         pdf.cell(41, 7 if not groot else 9, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
 
+    if res.get("korting_bedrag", 0) > 0:
+        tot_row("Subtotaal", res["subtotaal_voor_korting"])
+        tot_row(f"{res.get('korting_label', 'Korting')}", -res["korting_bedrag"])
     tot_row("Subtotaal excl. BTW", res["subtotaal"])
     tot_row(f"BTW {int(inp['btw']*100)}%", res["btw_bedrag"])
     pdf.set_draw_color(*NAVY)
