@@ -11,7 +11,7 @@ except Exception:
 from auth import require_login
 require_login()
 
-from storage import load_projecten, delete_project
+from storage import load_projecten, delete_project, _naar_bedrag
 
 st.title("📁 Bewaarde projecten")
 
@@ -31,7 +31,7 @@ for p in sorted(projecten, key=lambda x: str(x.get("id", "")), reverse=True):
         c1.markdown(f"**{p.get('klant', '')}**")
         c1.caption(p.get("datum", ""))
         c2.markdown(f"{'❄️ Airco' if p.get('type') == 'Airco' else '🔥 Warmtepomp'}")
-        c3.markdown(f"**€ {float(p.get('totaal_incl', 0)):,.2f}".replace(",", " ") + "** incl. BTW")
+        c3.markdown(f"**€ {_naar_bedrag(p.get('totaal_incl', 0)):,.2f}".replace(",", " ") + "** incl. BTW")
 
         if c4.button("Openen", key=f"open_{p['id']}", use_container_width=True):
             try:

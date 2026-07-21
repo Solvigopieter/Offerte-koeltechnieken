@@ -63,6 +63,38 @@ def _local_save(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def _naar_getal_tekst(waarde) -> str:
+    """Formatteert een getal als platte tekst met een apostrof-voorvoegsel.
+
+    De apostrof dwingt Google Sheets om de waarde als LETTERLIJKE TEKST op
+    te slaan, zonder enige getal- of locale-interpretatie. Zonder dit kan
+    Sheets (bij een Belgische/Nederlandse spreadsheet-locale, komma als
+    decimaalteken) een kommagetal als 4789.72 verkeerd inlezen — het
+    decimaalteken verdwijnt dan en er komt 478972 uit in plaats van 4789,72.
+    """
+    return f"'{waarde:.2f}" if isinstance(waarde, float) else f"'{waarde}"
+
+
+def _naar_bedrag(waarde) -> float:
+    """Leest een bedrag robuust terug in, ongeacht of het is opgeslagen als
+    een echt getal, platte tekst ('4789.72'), tekst met apostrof-voorvoegsel
+    ("'4789.72"), of — bij eerder al foutief opgeslagen/gelezen projecten —
+    Belgisch genoteerde tekst ('4.789,72')."""
+    if waarde is None or waarde == "":
+        return 0.0
+    if isinstance(waarde, (int, float)):
+        return float(waarde)
+    tekst = str(waarde).strip().lstrip("'")
+    try:
+        return float(tekst)
+    except ValueError:
+        pass
+    try:
+        return float(tekst.replace(".", "").replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
 # ---------------------------------------------------------------- prijzen
 def load_prijzen(defaults: dict) -> dict:
     """Geeft opgeslagen prijzen terug, aangevuld met defaults voor nieuwe sleutels."""
@@ -80,10 +112,7 @@ def load_prijzen(defaults: dict) -> dict:
     out = dict(defaults)
     for k, v in stored.items():
         if k in out:
-            try:
-                out[k] = float(v)
-            except (TypeError, ValueError):
-                pass
+            out[k] = _naar_bedrag(v)
     return out
 
 
@@ -92,7 +121,7 @@ def save_prijzen(prijzen: dict):
         ws = _ws("Prijzen", ["key", "value"])
         ws.clear()
         ws.append_row(["key", "value"])
-        rows = [[k, v] for k, v in prijzen.items()]
+        rows = [[k, _naar_getal_tekst(v)] for k, v in prijzen.items()]
         if rows:
             ws.append_rows(rows)
     else:
@@ -114,7 +143,9 @@ def save_project(ptype: str, klant: str, totaal_incl: float, payload: dict) -> s
     }
     if _use_gsheets():
         ws = _ws("Projecten", PROJECT_HEADERS)
-        ws.append_row([rec[h] for h in PROJECT_HEADERS])
+        # totaal_incl expliciet als forced-text wegschrijven (zie _naar_getal_tekst)
+        rij = [rec[h] if h != "totaal_incl" else _naar_getal_tekst(rec[h]) for h in PROJECT_HEADERS]
+        ws.append_row(rij)
     else:
         data = _local_load()
         data.setdefault("projecten", []).append(rec)
@@ -126,10 +157,15 @@ def load_projecten() -> list[dict]:
     if _use_gsheets():
         try:
             ws = _ws("Projecten", PROJECT_HEADERS)
-            return ws.get_all_records()
+            projecten = ws.get_all_records()
         except Exception as e:
             st.warning(f"Kon projecten niet laden: {e}")
             return []
+        # totaal_incl altijd robuust naar een echt getal omzetten, ongeacht
+        # hoe het precies is opgeslagen (zie _naar_bedrag).
+        for p in projecten:
+            p["totaal_incl"] = _naar_bedrag(p.get("totaal_incl"))
+        return projecten
     return _local_load().get("projecten", [])
 
 
