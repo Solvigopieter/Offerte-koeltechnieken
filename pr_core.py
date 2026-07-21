@@ -275,6 +275,24 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
                         f"{aantal} st", inkoop_tot, verkoop_tot, eenheid_verkoop))
             toestel_verkoop += verkoop_tot
             n_totaal_blok = aantal
+        elif blok.get("custom_binnenunits"):
+            # Multi-split met verschillende binnenunit-types op dezelfde buitenunit(en)
+            # (bv. 1x wandmodel + 1x vloerconsole samen op 1 buitenunit)
+            buiten_eenheid = _vk(blok["prijs_buiten"], blok.get("prijs_buiten_verkoop", 0), marge)
+            buiten_inkoop = blok["prijs_buiten"] * aantal
+            buiten_verkoop = buiten_eenheid * aantal
+            mat.append((f"Buitenunit {blok.get('merk_model', '')}{label}".strip(), f"{aantal} st", buiten_inkoop, buiten_verkoop, buiten_eenheid))
+            toestel_verkoop += buiten_verkoop
+            n_totaal_blok = 0
+            for bu in blok["custom_binnenunits"]:
+                bu_inkoop_stuk = float(bu.get("inkoop") or 0)
+                bu_verkoop_stuk = _vk(bu_inkoop_stuk, float(bu.get("verkoop") or 0), marge)
+                bu_naam = (bu.get("merk_model") or "Binnenunit").strip() or "Binnenunit"
+                bu_inkoop_tot = bu_inkoop_stuk * aantal
+                bu_verkoop_tot = bu_verkoop_stuk * aantal
+                mat.append((f"Binnenunit {bu_naam}{label}", f"{aantal} st", bu_inkoop_tot, bu_verkoop_tot, bu_verkoop_stuk))
+                toestel_verkoop += bu_verkoop_tot
+                n_totaal_blok += aantal
         else:
             buiten_eenheid = _vk(blok["prijs_buiten"], blok.get("prijs_buiten_verkoop", 0), marge)
             buiten_inkoop = blok["prijs_buiten"] * aantal

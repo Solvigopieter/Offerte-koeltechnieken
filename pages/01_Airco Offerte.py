@@ -293,6 +293,12 @@ else:
             blok_aantal = st.number_input("Aantal van dit systeem", min_value=1, value=1, step=1, key="a_blok_aantal",
                 help="Bv. 2 losse mono-split airco's van dezelfde grootte in dit blok = hier 2 invullen.")
 
+        blok_verschillende_binnen = False
+        if blok_n > 1:
+            blok_verschillende_binnen = st.checkbox(
+                "Binnenunits zijn niet allemaal hetzelfde (bv. wandmodel + vloerconsole samen op 1 buitenunit)",
+                key="a_blok_verschillende_binnen")
+
         with st.expander("📋 Prijs uit Panasonic-catalogus halen (optioneel)"):
             if blok_n == 1:
                 blok_item = mono_picker("a_blok_cat_mono")
@@ -318,16 +324,67 @@ else:
 
                 st.button("↳ Vul buitenunit-prijs in", key="a_blok_cat_buiten_btn", on_click=_vul_blok_buiten)
 
-                st.markdown("**Binnenunit** (prijs per stuk)")
-                blok_binnen_item = multi_binnen_picker("a_blok_cat_binnen")
-                st.session_state["_a_blok_cat_binnen_item"] = blok_binnen_item
+                if not blok_verschillende_binnen:
+                    st.markdown("**Binnenunit** (prijs per stuk)")
+                    blok_binnen_item = multi_binnen_picker("a_blok_cat_binnen")
+                    st.session_state["_a_blok_cat_binnen_item"] = blok_binnen_item
 
-                def _vul_blok_binnen():
-                    it = st.session_state["_a_blok_cat_binnen_item"]
-                    st.session_state["a_blok_prijs_binnen"] = _inkoop_schatting(it[3])
-                    st.session_state["a_blok_prijs_binnen_verkoop"] = float(it[3])
+                    def _vul_blok_binnen():
+                        it = st.session_state["_a_blok_cat_binnen_item"]
+                        st.session_state["a_blok_prijs_binnen"] = _inkoop_schatting(it[3])
+                        st.session_state["a_blok_prijs_binnen_verkoop"] = float(it[3])
 
-                st.button("↳ Vul binnenunit-prijs in", key="a_blok_cat_binnen_btn", on_click=_vul_blok_binnen)
+                    st.button("↳ Vul binnenunit-prijs in", key="a_blok_cat_binnen_btn", on_click=_vul_blok_binnen)
+                else:
+                    st.markdown("**Binnenunit toevoegen aan dit systeem**")
+                    blok_binnen_item = multi_binnen_picker("a_blok_cat_binnen_multi")
+                    st.session_state["_a_blok_cat_binnen_multi_item"] = blok_binnen_item
+
+                    def _voeg_blok_binnen_toe():
+                        it = st.session_state["_a_blok_cat_binnen_multi_item"]
+                        naam = cat.binnen_naam(it)
+                        nieuwe_rij = pd.DataFrame([{
+                            "Merk & model": naam, "Inkoopprijs (EUR)": _inkoop_schatting(it[3]),
+                            "Verkoopprijs (EUR, 0=auto)": float(it[3]),
+                        }])
+                        bestaand = st.session_state.get("a_blok_binnen_df")
+                        if bestaand is None or bestaand.empty:
+                            st.session_state["a_blok_binnen_df"] = nieuwe_rij
+                        else:
+                            st.session_state["a_blok_binnen_df"] = pd.concat([bestaand, nieuwe_rij], ignore_index=True)
+                        st.session_state.pop("a_blok_binnen_editor", None)
+
+                    st.button("↳ Toevoegen aan tabel hieronder", key="a_blok_cat_binnen_multi_btn",
+                             on_click=_voeg_blok_binnen_toe)
+
+        blok_custom_binnen = []
+        if blok_n > 1 and blok_verschillende_binnen:
+            st.markdown("**Binnenunits in dit systeem — elk apart**")
+            binnen_default = pd.DataFrame({
+                "Merk & model": pd.Series(dtype="str"),
+                "Inkoopprijs (EUR)": pd.Series(dtype="float"),
+                "Verkoopprijs (EUR, 0=auto)": pd.Series(dtype="float"),
+            })
+            blok_binnen_edited = st.data_editor(
+                st.session_state.get("a_blok_binnen_df", binnen_default),
+                num_rows="dynamic", use_container_width=True, key="a_blok_binnen_editor",
+                column_config={
+                    "Inkoopprijs (EUR)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
+                    "Verkoopprijs (EUR, 0=auto)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
+                },
+            )
+            st.session_state["a_blok_binnen_df"] = blok_binnen_edited
+            for _, row in blok_binnen_edited.iterrows():
+                naam_ruw = row.get("Merk & model")
+                naam = "" if pd.isna(naam_ruw) else str(naam_ruw).strip()
+                inkoop_ruw = row.get("Inkoopprijs (EUR)")
+                inkoop = 0.0 if pd.isna(inkoop_ruw) else float(inkoop_ruw)
+                verkoop_ruw = row.get("Verkoopprijs (EUR, 0=auto)")
+                verkoop = 0.0 if pd.isna(verkoop_ruw) else float(verkoop_ruw)
+                if naam or inkoop > 0:
+                    blok_custom_binnen.append({"merk_model": naam, "inkoop": inkoop, "verkoop": verkoop})
+            if not blok_custom_binnen:
+                st.warning("Voeg minstens één binnenunit toe aan de tabel hierboven.")
 
         pb1, pb2 = st.columns(2)
         with pb1:
@@ -338,7 +395,7 @@ else:
                 blok_prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_buiten")
                 blok_prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0=auto)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_buiten_verkoop")
         with pb2:
-            if blok_n > 1:
+            if blok_n > 1 and not blok_verschillende_binnen:
                 blok_prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_binnen")
                 blok_prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0=auto)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_binnen_verkoop")
             else:
@@ -349,13 +406,25 @@ else:
         if st.button("✅ Systeem toevoegen aan offerte", key="a_blok_add_btn"):
             if blok_prijs_buiten <= 0:
                 st.error("Vul eerst een inkoopprijs in vóór je dit systeem toevoegt.")
+            elif blok_n > 1 and blok_verschillende_binnen and not blok_custom_binnen:
+                st.error("Voeg minstens één binnenunit toe aan de tabel.")
             else:
-                st.session_state["a_blokken"].append(dict(
+                nieuw_blok = dict(
                     naam=blok_naam or f"Systeem {len(st.session_state['a_blokken']) + 1}",
-                    type="mono" if blok_n == 1 else "multi", n_binnen=blok_n, aantal_systemen=int(blok_aantal),
+                    type="mono" if blok_n == 1 else "multi",
+                    n_binnen=(len(blok_custom_binnen) if (blok_n > 1 and blok_verschillende_binnen) else blok_n),
+                    aantal_systemen=int(blok_aantal),
                     merk_model=blok_merk, prijs_buiten=float(blok_prijs_buiten), prijs_buiten_verkoop=float(blok_prijs_buiten_verkoop),
                     prijs_binnen=float(blok_prijs_binnen), prijs_binnen_verkoop=float(blok_prijs_binnen_verkoop),
-                ))
+                )
+                if blok_n > 1 and blok_verschillende_binnen:
+                    nieuw_blok["custom_binnenunits"] = blok_custom_binnen
+                st.session_state["a_blokken"].append(nieuw_blok)
+                st.session_state["a_blok_binnen_df"] = pd.DataFrame({
+                    "Merk & model": pd.Series(dtype="str"),
+                    "Inkoopprijs (EUR)": pd.Series(dtype="float"),
+                    "Verkoopprijs (EUR, 0=auto)": pd.Series(dtype="float"),
+                })
                 st.rerun()
 
     if st.session_state["a_blokken"]:
