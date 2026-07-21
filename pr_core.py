@@ -243,7 +243,130 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     }
 
 
-def bereken_wp(inp: dict, P: dict) -> dict:
+def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
+    """Voor een offerte met meerdere VERSCHILLENDE soorten systemen samen
+    (bv. 1x multi-split met 3 binnenunits + 1x losse mono-split in dezelfde woning).
+
+    blokken: lijst van dicts, elk met:
+        naam, type ("mono"/"multi"), n_binnen, aantal_systemen, merk_model,
+        prijs_buiten, prijs_buiten_verkoop, prijs_binnen, prijs_binnen_verkoop
+    gedeeld: dict met de installatie-brede velden (leiding_m, goot_m, goot_bij_klein,
+        doorvoeren, koelmiddel_m, condenspomp, console, elek, hoogtewerker,
+        techniekers, uren_manueel, km, btw, arbeid_aanrekenen, dossier_aanrekenen,
+        korting_type, korting_waarde, korting_label)
+    """
+    marge = 1 + P["marge_materiaal_pct"] / 100.0
+    mat = []
+    toestel_verkoop = 0.0
+    aantal_systemen_totaal = 0
+    n_totaal_totaal = 0
+    uren_totaal = 0.0
+
+    for blok in blokken:
+        n = max(1, int(blok.get("n_binnen", 1)))
+        aantal = max(1, int(blok.get("aantal_systemen", 1)))
+        label = f" — {blok['naam']}" if blok.get("naam") else ""
+
+        if blok.get("type") == "mono" and n == 1:
+            eenheid_verkoop = _vk(blok["prijs_buiten"], blok.get("prijs_buiten_verkoop", 0), marge)
+            inkoop_tot = blok["prijs_buiten"] * aantal
+            verkoop_tot = eenheid_verkoop * aantal
+            mat.append((f"Toestel (binnen- + buitenunit) {blok.get('merk_model', '')}{label}".strip(),
+                        f"{aantal} st", inkoop_tot, verkoop_tot, eenheid_verkoop))
+            toestel_verkoop += verkoop_tot
+            n_totaal_blok = aantal
+        else:
+            buiten_eenheid = _vk(blok["prijs_buiten"], blok.get("prijs_buiten_verkoop", 0), marge)
+            buiten_inkoop = blok["prijs_buiten"] * aantal
+            buiten_verkoop = buiten_eenheid * aantal
+            n_totaal_blok = n * aantal
+            binnen_eenheid = _vk(blok.get("prijs_binnen", 0), blok.get("prijs_binnen_verkoop", 0), marge)
+            binnen_inkoop = blok.get("prijs_binnen", 0) * n_totaal_blok
+            binnen_verkoop = binnen_eenheid * n_totaal_blok
+            mat.append((f"Buitenunit {blok.get('merk_model', '')}{label}".strip(), f"{aantal} st", buiten_inkoop, buiten_verkoop, buiten_eenheid))
+            mat.append((f"Binnenunit(s){label}", f"{n_totaal_blok} st", binnen_inkoop, binnen_verkoop, binnen_eenheid))
+            toestel_verkoop += buiten_verkoop + binnen_verkoop
+
+        aantal_systemen_totaal += aantal
+        n_totaal_totaal += n_totaal_blok
+        uren_per_systeem = (
+            P["a_uren_basis"]
+            + (n - 1) * P["a_uren_extra_unit"]
+            + (P["a_uren_elek"] if gedeeld.get("elek") else 0)
+            + (P["a_uren_pomp"] if gedeeld.get("condenspomp") else 0)
+        )
+        uren_totaal += uren_per_systeem * aantal
+
+    def std(om, aantal_txt, inkoop_totaal, aantal_num=1):
+        verkoop_totaal = inkoop_totaal * marge
+        eenheid = verkoop_totaal / aantal_num if aantal_num else verkoop_totaal
+        mat.append((om, aantal_txt, inkoop_totaal, verkoop_totaal, eenheid))
+
+    std("Koelleidingen (geïsoleerd)", f"{gedeeld['leiding_m']} m", gedeeld["leiding_m"] * P["a_leiding_pm"], aantal_num=gedeeld["leiding_m"] or 1)
+
+    goot_inkoop = gedeeld["goot_m"] * P["a_goot_pm"]
+    goot_bij_klein = gedeeld.get("goot_bij_klein", False)
+    if gedeeld["goot_m"] > 0 and not goot_bij_klein:
+        std("Sierlijst / leidinggoot", f"{gedeeld['goot_m']} m", goot_inkoop, aantal_num=gedeeld["goot_m"])
+
+    klein_inkoop = P["a_klein_basis"] * aantal_systemen_totaal + n_totaal_totaal * P["a_klein_per_unit"]
+    if gedeeld["goot_m"] > 0 and goot_bij_klein:
+        klein_inkoop += goot_inkoop
+    std("Klein materiaal & bevestiging", "", klein_inkoop)
+
+    if gedeeld.get("koelmiddel_m", 0) > 0:
+        std("Extra koelmiddel R32", f"{gedeeld['koelmiddel_m']} m", gedeeld["koelmiddel_m"] * P["a_koelmiddel_pm"], aantal_num=gedeeld["koelmiddel_m"])
+    if gedeeld.get("condenspomp"):
+        std("Condenspomp", f"{n_totaal_totaal} st" if n_totaal_totaal > 1 else "1 st", P["a_condenspomp"] * n_totaal_totaal, aantal_num=n_totaal_totaal)
+    if gedeeld.get("console"):
+        std("Muurconsole + trillingsdempers", f"{aantal_systemen_totaal} st", P["a_console"] * aantal_systemen_totaal, aantal_num=aantal_systemen_totaal)
+    if gedeeld.get("elek"):
+        std("Elektrisch materiaal", f"{aantal_systemen_totaal} circuit(s)", P["a_elek_mat"] * aantal_systemen_totaal, aantal_num=aantal_systemen_totaal)
+
+    mat_inkoop = sum(m[2] for m in mat)
+    mat_verkoop = sum(m[3] for m in mat)
+
+    uren_auto = uren_totaal + gedeeld.get("doorvoeren", 0) * P["a_uren_doorvoer"]
+    uren = gedeeld["uren_manueel"] if gedeeld.get("uren_manueel", 0) > 0 else uren_auto
+    arbeid_aanrekenen = gedeeld.get("arbeid_aanrekenen", True)
+    arbeid = (uren * gedeeld["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+
+    km_kost = gedeeld["km"] * P["km_prijs"] * 2
+    extra = P["a_hoogtewerker"] if gedeeld.get("hoogtewerker") else 0.0
+    dossier_aanrekenen = gedeeld.get("dossier_aanrekenen", True)
+    vast = P["vast_dossier"] if dossier_aanrekenen else 0.0
+
+    subtotaal_voor_korting = mat_verkoop + arbeid + km_kost + vast + extra
+
+    korting_type = gedeeld.get("korting_type", "geen")
+    korting_waarde = float(gedeeld.get("korting_waarde", 0) or 0)
+    korting_label = (gedeeld.get("korting_label") or "Korting").strip() or "Korting"
+    if korting_type == "pct" and korting_waarde > 0:
+        korting_bedrag = toestel_verkoop * korting_waarde / 100.0
+    elif korting_type == "vast" and korting_waarde > 0:
+        korting_bedrag = min(korting_waarde, toestel_verkoop)
+    else:
+        korting_bedrag = 0.0
+
+    subtotaal = subtotaal_voor_korting - korting_bedrag
+    subtotaal = max(subtotaal, P["minimum_tarief"])
+    btw = subtotaal * gedeeld["btw"]
+    totaal = subtotaal + btw
+
+    loonkost = uren * gedeeld["techniekers"] * P["loonkost_intern"] * P.get("loonkost_meetellen", 1.0)
+    winst = subtotaal - mat_inkoop - loonkost - km_kost * 0.6
+
+    return {
+        "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
+        "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
+        "arbeid_aanrekenen": arbeid_aanrekenen,
+        "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": extra,
+        "subtotaal_voor_korting": subtotaal_voor_korting,
+        "korting_bedrag": korting_bedrag, "korting_label": korting_label,
+        "subtotaal": subtotaal, "btw_bedrag": btw, "totaal": totaal, "winst": winst,
+        "marge": marge,
+        "aantal_systemen_totaal": aantal_systemen_totaal, "n_totaal_totaal": n_totaal_totaal,
+    }
     marge = 1 + P["marge_materiaal_pct"] / 100.0
 
     wp_inkoop = inp["prijs_wp"]

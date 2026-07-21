@@ -10,9 +10,10 @@ from auth import require_login
 require_login()
 
 from datetime import date, timedelta
+import json
 import pandas as pd
 
-from pr_core import DEFAULT_PRIJZEN, bereken_airco, maak_pdf, gen_offertenummer, eenheid_label
+from pr_core import DEFAULT_PRIJZEN, bereken_airco, bereken_airco_gemengd, maak_pdf, gen_offertenummer, eenheid_label
 from storage import load_prijzen, save_project
 import pr_catalogus as cat
 
@@ -26,6 +27,17 @@ if loaded and loaded.get("_type") == "airco":
     for k, v in loaded.items():
         if not k.startswith("_") and not k.endswith("_btn"):
             st.session_state[f"a_{k}"] = v
+    if "a_blokken_json" in st.session_state:
+        try:
+            st.session_state["a_blokken"] = json.loads(st.session_state["a_blokken_json"])
+        except Exception:
+            st.session_state["a_blokken"] = []
+    if "a_units_json" in st.session_state:
+        try:
+            st.session_state["a_units_df"] = pd.DataFrame(json.loads(st.session_state["a_units_json"]))
+            st.session_state.pop("a_units_editor", None)  # forceer her-initialisatie van de tabelwidget
+        except Exception:
+            pass
     st.success("Project geladen — pas aan waar nodig.")
 
 # ================= Klant =================
@@ -41,59 +53,7 @@ with c2:
     offertedatum = st.date_input("Offertedatum", date.today())
     verloopdatum = st.date_input("Geldig tot", date.today() + timedelta(days=30))
 
-# ================= Configuratie =================
-st.subheader("Configuratie")
-c3, c4, c5 = st.columns(3)
-with c3:
-    TYPES = {"Mono-split (1 binnenunit per systeem)": 1, "Multi-split — 2 binnenunits op 1 buitenunit": 2,
-             "Multi-split — 3 binnenunits op 1 buitenunit": 3, "Multi-split — 4 binnenunits op 1 buitenunit": 4}
-    type_label = st.selectbox("Type installatie", list(TYPES.keys()), key="a_type")
-    n_binnen = TYPES[type_label]
-    is_mono = (n_binnen == 1)
-
-    verschillende_toestellen = False
-    if is_mono:
-        verschillende_toestellen = st.checkbox("Toestellen hebben elk een andere grootte/prijs", key="a_verschillende_toestellen",
-            help="Aanvinken als je bv. 3 losse mono-split airco's plaatst die niet allemaal hetzelfde vermogen/merk/prijs hebben. "
-                 "Je vult dan hieronder elk toestel apart in.")
-
-    if verschillende_toestellen:
-        st.caption("Aantal systemen = aantal rijen in de tabel hieronder.")
-        aantal_systemen = 1  # wordt overschreven na de tabel
-        merk_model = ""
-    else:
-        aantal_systemen = st.number_input("Aantal aparte systemen (elk met eigen buitenunit)", min_value=1, value=1, step=1, key="a_aantal_systemen",
-            help="Bv. 3 losse mono-split airco's = 'Mono-split' + hier 3 invullen (3× eigen buitenunit). "
-                 "Voor 1 buitenunit met 3 binnenunits kies je hierboven 'Multi-split — 3 binnenunits' en laat dit op 1 staan.")
-        merk_model = st.text_input("Merk & model (op offerte)", key="a_merk", placeholder="bv. Daikin Perfera 3,5 kW")
-with c4:
-    if verschillende_toestellen:
-        st.markdown("**Toestellen**")
-        st.caption("Prijzen en merk/model vul je hieronder per toestel in ↓")
-        prijs_buiten, prijs_buiten_verkoop = 0.0, 0.0
-        prijs_binnen, prijs_binnen_verkoop = 0.0, 0.0
-    elif is_mono:
-        st.markdown("**Toestel (set binnen + buitenunit)**")
-        prijs_set = st.number_input("Inkoopprijs per set (EUR)", min_value=0.0, value=1100.0, step=10.0, key="a_prijs_set",
-            help="Bij mono-split koop je meestal 1 set (binnen- + buitenunit samen), geen aparte prijzen.")
-        prijs_set_verkoop = st.number_input("Verkoopprijs per set (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_set_verkoop",
-            help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in voor een vaste verkoopprijs, los van de marge-instelling.")
-        prijs_buiten, prijs_buiten_verkoop = prijs_set, prijs_set_verkoop
-        prijs_binnen, prijs_binnen_verkoop = 0.0, 0.0
-    else:
-        st.markdown("**Buitenunit**")
-        prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=900.0, step=10.0, key="a_prijs_buiten")
-        prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_buiten_verkoop",
-            help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in als je zelf een vaste verkoopprijs hanteert (bv. Panasonic-catalogusprijs), los van de marge-instelling.")
-        st.markdown("**Binnenunit**")
-        prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
-        prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
-with c5:
-    leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
-    goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
-    goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
-        help="Handig als er maar een klein stukje kabelgoot nodig is — de kost wordt dan meegeteld in 'Klein materiaal & bevestiging' in plaats van als eigen regel op de offerte te verschijnen.")
-
+# ================= Hulpfuncties (gelden voor beide modi) =================
 korting_pct = P.get("panasonic_korting_pct", 40.0)
 
 
@@ -128,121 +88,303 @@ def mono_picker(prefix):
     return item
 
 
-# ================= Panasonic-catalogus: automatische prijsinvulling =================
-if not verschillende_toestellen:
-    with st.expander("📋 Kies toestel uit Panasonic-catalogus (vult prijs & merk/model automatisch in)"):
+def multi_buiten_picker(prefix):
+    """Getrapte keuze uit MULTI_BUITEN: systeem -> buitenunit. Geeft gekozen item terug."""
+    b1, b2 = st.columns(2)
+    with b1:
+        buiten_fams = sorted(set(x[0] for x in cat.MULTI_BUITEN))
+        bfam = st.selectbox("Systeem", buiten_fams, key=f"{prefix}_fam")
+    with b2:
+        buiten_subset = [x for x in cat.MULTI_BUITEN if x[0] == bfam]
+        bmodel = st.selectbox("Buitenunit", buiten_subset,
+            format_func=lambda x: f"{x[1]} ({x[2]}) — {_fmt_eur(x[3])}", key=f"{prefix}_model")
+    st.caption(f"{cat.buiten_naam(bmodel)} — adviesprijs {_fmt_eur(bmodel[3])} · geschatte inkoop (−{korting_pct:.0f}%): {_fmt_eur(_inkoop_schatting(bmodel[3]))}")
+    return bmodel
+
+
+def multi_binnen_picker(prefix):
+    """Getrapte keuze uit MULTI_BINNEN: type -> kleur -> vermogen. Geeft gekozen item terug."""
+    i1, i2, i3 = st.columns(3)
+    with i1:
+        binnen_fams = sorted(set(x[0] for x in cat.MULTI_BINNEN))
+        ifam = st.selectbox("Type", binnen_fams, key=f"{prefix}_fam")
+    binnen_subset = [x for x in cat.MULTI_BINNEN if x[0] == ifam]
+    ikleuren = sorted(set(x[1] for x in binnen_subset if x[1]))
+    if ikleuren:
+        with i2:
+            ikleur = st.selectbox("Kleur", ikleuren, key=f"{prefix}_kleur")
+        binnen_subset = [x for x in binnen_subset if x[1] == ikleur]
+    else:
+        with i2:
+            st.selectbox("Kleur", ["—"], key=f"{prefix}_kleur_x", disabled=True)
+    with i3:
+        ivermogens = sorted(set(x[2] for x in binnen_subset))
+        ikw = st.selectbox("Vermogen (kW)", ivermogens, key=f"{prefix}_kw")
+    item = [x for x in binnen_subset if x[2] == ikw][0]
+    st.caption(f"{cat.binnen_naam(item)} — adviesprijs {_fmt_eur(item[3])} · geschatte inkoop (−{korting_pct:.0f}%): {_fmt_eur(_inkoop_schatting(item[3]))}")
+    return item
+
+
+TYPE_OPTIES = {"Mono-split (1 binnenunit)": 1, "Multi-split — 2 binnenunits op 1 buitenunit": 2,
+               "Multi-split — 3 binnenunits op 1 buitenunit": 3, "Multi-split — 4 binnenunits op 1 buitenunit": 4}
+
+# ================= Type installatie =================
+gemengd = st.checkbox("🔀 Gemengde installatie (bv. multi-split + losse mono-split samen in dezelfde woning)", key="a_gemengd",
+    help="Gebruik dit wanneer je in dezelfde offerte verschillende SOORTEN systemen combineert "
+         "(bv. een multi-split met 3 binnenunits voor de living, plus een losse mono-split voor een slaapkamer). "
+         "Leidingwerk, klein materiaal, arbeid en verplaatsing vul je dan één keer in voor de volledige job.")
+
+if not gemengd:
+    # ============================================================ ENKELVOUDIGE INSTALLATIE
+    st.subheader("Configuratie")
+    c3, c4 = st.columns(2)
+    with c3:
+        type_label = st.selectbox("Type installatie", list(TYPE_OPTIES.keys()), key="a_type")
+        n_binnen = TYPE_OPTIES[type_label]
+        is_mono = (n_binnen == 1)
+
+        verschillende_toestellen = False
         if is_mono:
-            item = mono_picker("a_cat_mono")
+            verschillende_toestellen = st.checkbox("Toestellen hebben elk een andere grootte/prijs", key="a_verschillende_toestellen",
+                help="Aanvinken als je bv. 3 losse mono-split airco's plaatst die niet allemaal hetzelfde vermogen/merk/prijs hebben. "
+                     "Je vult dan hieronder elk toestel apart in.")
 
-            def _vul_mono(gekozen=None):
-                st.session_state["a_merk"] = cat.mono_naam(st.session_state["_a_cat_mono_item"])
-                st.session_state["a_prijs_set"] = _inkoop_schatting(st.session_state["_a_cat_mono_item"][3])
-                st.session_state["a_prijs_set_verkoop"] = float(st.session_state["_a_cat_mono_item"][3])
-
-            st.session_state["_a_cat_mono_item"] = item
-            st.button("↳ Vul deze prijs in", key="a_cat_mono_btn", on_click=_vul_mono)
+        if verschillende_toestellen:
+            st.caption("Aantal systemen = aantal rijen in de tabel hieronder.")
+            aantal_systemen = 1  # wordt overschreven na de tabel
+            merk_model = ""
+        else:
+            aantal_systemen = st.number_input("Aantal aparte systemen (elk met eigen buitenunit)", min_value=1, value=1, step=1, key="a_aantal_systemen",
+                help="Bv. 3 losse mono-split airco's = 'Mono-split' + hier 3 invullen (3× eigen buitenunit). "
+                     "Voor 1 buitenunit met 3 binnenunits kies je hierboven 'Multi-split — 3 binnenunits' en laat dit op 1 staan.")
+            merk_model = st.text_input("Merk & model (op offerte)", key="a_merk", placeholder="bv. Daikin Perfera 3,5 kW")
+    with c4:
+        if verschillende_toestellen:
+            st.markdown("**Toestellen**")
+            st.caption("Prijzen en merk/model vul je hieronder per toestel in ↓")
+            prijs_buiten, prijs_buiten_verkoop = 0.0, 0.0
+            prijs_binnen, prijs_binnen_verkoop = 0.0, 0.0
+        elif is_mono:
+            st.markdown("**Toestel (set binnen + buitenunit)**")
+            prijs_set = st.number_input("Inkoopprijs per set (EUR)", min_value=0.0, value=1100.0, step=10.0, key="a_prijs_set",
+                help="Bij mono-split koop je meestal 1 set (binnen- + buitenunit samen), geen aparte prijzen.")
+            prijs_set_verkoop = st.number_input("Verkoopprijs per set (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_set_verkoop",
+                help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in voor een vaste verkoopprijs, los van de marge-instelling.")
+            prijs_buiten, prijs_buiten_verkoop = prijs_set, prijs_set_verkoop
+            prijs_binnen, prijs_binnen_verkoop = 0.0, 0.0
         else:
             st.markdown("**Buitenunit**")
-            b1, b2 = st.columns(2)
-            with b1:
-                buiten_fams = sorted(set(x[0] for x in cat.MULTI_BUITEN))
-                bfam = st.selectbox("Systeem", buiten_fams, key="a_cat_bfam")
-            with b2:
-                buiten_subset = [x for x in cat.MULTI_BUITEN if x[0] == bfam]
-                bmodel = st.selectbox("Buitenunit", buiten_subset,
-                    format_func=lambda x: f"{x[1]} ({x[2]}) — {_fmt_eur(x[3])}", key="a_cat_bmodel")
-            st.session_state["_a_cat_buiten_item"] = bmodel
+            prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=900.0, step=10.0, key="a_prijs_buiten")
+            prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_buiten_verkoop",
+                help="Laat op 0 om automatisch inkoop × marge% te gebruiken. Vul in als je zelf een vaste verkoopprijs hanteert (bv. Panasonic-catalogusprijs), los van de marge-instelling.")
+            st.markdown("**Binnenunit**")
+            prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
+            prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
 
-            def _vul_buiten():
-                it = st.session_state["_a_cat_buiten_item"]
-                st.session_state["a_merk"] = cat.buiten_naam(it)
-                st.session_state["a_prijs_buiten"] = _inkoop_schatting(it[3])
-                st.session_state["a_prijs_buiten_verkoop"] = float(it[3])
+    # ---- Panasonic-catalogus: automatische prijsinvulling ----
+    if not verschillende_toestellen:
+        with st.expander("📋 Kies toestel uit Panasonic-catalogus (vult prijs & merk/model automatisch in)"):
+            if is_mono:
+                item = mono_picker("a_cat_mono")
 
-            st.button("↳ Vul buitenunit-prijs in", key="a_cat_buiten_btn", on_click=_vul_buiten)
+                def _vul_mono():
+                    st.session_state["a_merk"] = cat.mono_naam(st.session_state["_a_cat_mono_item"])
+                    st.session_state["a_prijs_set"] = _inkoop_schatting(st.session_state["_a_cat_mono_item"][3])
+                    st.session_state["a_prijs_set_verkoop"] = float(st.session_state["_a_cat_mono_item"][3])
 
-            st.markdown("**Binnenunit** (prijs per stuk)")
-            i1, i2, i3 = st.columns(3)
-            with i1:
-                binnen_fams = sorted(set(x[0] for x in cat.MULTI_BINNEN))
-                ifam = st.selectbox("Type", binnen_fams, key="a_cat_ifam")
-            binnen_subset = [x for x in cat.MULTI_BINNEN if x[0] == ifam]
-            ikleuren = sorted(set(x[1] for x in binnen_subset if x[1]))
-            if ikleuren:
-                with i2:
-                    ikleur = st.selectbox("Kleur", ikleuren, key="a_cat_ikleur")
-                binnen_subset = [x for x in binnen_subset if x[1] == ikleur]
+                st.session_state["_a_cat_mono_item"] = item
+                st.button("↳ Vul deze prijs in", key="a_cat_mono_btn", on_click=_vul_mono)
             else:
-                with i2:
-                    st.selectbox("Kleur", ["—"], key="a_cat_ikleur_x", disabled=True)
-            with i3:
-                ivermogens = sorted(set(x[2] for x in binnen_subset))
-                ikw = st.selectbox("Vermogen (kW)", ivermogens, key="a_cat_ikw")
-            binnen_item = [x for x in binnen_subset if x[2] == ikw][0]
-            st.info(f"**{cat.binnen_naam(binnen_item)}** — adviesprijs {_fmt_eur(binnen_item[3])} · geschatte inkoop: {_fmt_eur(_inkoop_schatting(binnen_item[3]))}")
-            st.session_state["_a_cat_binnen_item"] = binnen_item
+                st.markdown("**Buitenunit**")
+                bmodel = multi_buiten_picker("a_cat_buiten")
+                st.session_state["_a_cat_buiten_item"] = bmodel
 
-            def _vul_binnen():
-                it = st.session_state["_a_cat_binnen_item"]
-                st.session_state["a_prijs_binnen"] = _inkoop_schatting(it[3])
-                st.session_state["a_prijs_binnen_verkoop"] = float(it[3])
+                def _vul_buiten():
+                    it = st.session_state["_a_cat_buiten_item"]
+                    st.session_state["a_merk"] = cat.buiten_naam(it)
+                    st.session_state["a_prijs_buiten"] = _inkoop_schatting(it[3])
+                    st.session_state["a_prijs_buiten_verkoop"] = float(it[3])
 
-            st.button("↳ Vul binnenunit-prijs in", key="a_cat_binnen_btn", on_click=_vul_binnen)
-        st.caption(f"Inkoopprijs = adviesprijs × {(100-korting_pct)/100:.2f} ({korting_pct:.0f}% dealerkorting — instelbaar bij Prijsinstellingen). "
-                   f"Verkoopprijs = Panasonic-adviesprijs, zelf aan te passen.")
+                st.button("↳ Vul buitenunit-prijs in", key="a_cat_buiten_btn", on_click=_vul_buiten)
 
-custom_units = []
-if verschillende_toestellen:
-    st.markdown("**Toestellen — elk apart merk, model en prijs**")
+                st.markdown("**Binnenunit** (prijs per stuk)")
+                binnen_item = multi_binnen_picker("a_cat_binnen")
+                st.session_state["_a_cat_binnen_item"] = binnen_item
 
-    with st.expander("📋 Toestel uit Panasonic-catalogus toevoegen aan de tabel"):
-        item_add = mono_picker("a_cat_add")
-        st.session_state["_a_cat_add_item"] = item_add
-        aantal_add = st.number_input("Aantal van dit toestel toevoegen", min_value=1, value=1, step=1, key="a_cat_add_n")
+                def _vul_binnen():
+                    it = st.session_state["_a_cat_binnen_item"]
+                    st.session_state["a_prijs_binnen"] = _inkoop_schatting(it[3])
+                    st.session_state["a_prijs_binnen_verkoop"] = float(it[3])
 
-        def _voeg_toe():
-            it = st.session_state["_a_cat_add_item"]
-            naam = cat.mono_naam(it)
-            nieuwe_rijen = pd.DataFrame([
-                {"Merk & model": naam, "Inkoopprijs (EUR)": _inkoop_schatting(it[3]), "Verkoopprijs (EUR, 0=auto)": float(it[3])}
-                for _ in range(int(st.session_state["a_cat_add_n"]))
-            ])
-            bestaand = st.session_state.get("a_units_df")
-            if bestaand is None or bestaand.empty:
-                st.session_state["a_units_df"] = nieuwe_rijen
+                st.button("↳ Vul binnenunit-prijs in", key="a_cat_binnen_btn", on_click=_vul_binnen)
+            st.caption(f"Inkoopprijs = adviesprijs × {(100-korting_pct)/100:.2f} ({korting_pct:.0f}% dealerkorting — instelbaar bij Prijsinstellingen). "
+                       f"Verkoopprijs = Panasonic-adviesprijs, zelf aan te passen.")
+
+    custom_units = []
+    if verschillende_toestellen:
+        st.markdown("**Toestellen — elk apart merk, model en prijs**")
+
+        with st.expander("📋 Toestel uit Panasonic-catalogus toevoegen aan de tabel"):
+            item_add = mono_picker("a_cat_add")
+            st.session_state["_a_cat_add_item"] = item_add
+            aantal_add = st.number_input("Aantal van dit toestel toevoegen", min_value=1, value=1, step=1, key="a_cat_add_n")
+
+            def _voeg_toe():
+                it = st.session_state["_a_cat_add_item"]
+                naam = cat.mono_naam(it)
+                nieuwe_rijen = pd.DataFrame([
+                    {"Merk & model": naam, "Inkoopprijs (EUR)": _inkoop_schatting(it[3]), "Verkoopprijs (EUR, 0=auto)": float(it[3])}
+                    for _ in range(int(st.session_state["a_cat_add_n"]))
+                ])
+                bestaand = st.session_state.get("a_units_df")
+                if bestaand is None or bestaand.empty:
+                    st.session_state["a_units_df"] = nieuwe_rijen
+                else:
+                    st.session_state["a_units_df"] = pd.concat([bestaand, nieuwe_rijen], ignore_index=True)
+                st.session_state.pop("a_units_editor", None)
+
+            st.button("↳ Toevoegen aan tabel", key="a_cat_add_btn", on_click=_voeg_toe)
+
+        default_rows = pd.DataFrame({
+            "Merk & model": pd.Series(dtype="str"),
+            "Inkoopprijs (EUR)": pd.Series(dtype="float"),
+            "Verkoopprijs (EUR, 0=auto)": pd.Series(dtype="float"),
+        })
+        edited = st.data_editor(
+            st.session_state.get("a_units_df", default_rows),
+            num_rows="dynamic", use_container_width=True, key="a_units_editor",
+            column_config={
+                "Inkoopprijs (EUR)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
+                "Verkoopprijs (EUR, 0=auto)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
+            },
+        )
+        st.session_state["a_units_df"] = edited
+        for _, row in edited.iterrows():
+            naam_ruw = row.get("Merk & model")
+            naam = "" if pd.isna(naam_ruw) else str(naam_ruw).strip()
+            inkoop_ruw = row.get("Inkoopprijs (EUR)")
+            inkoop = 0.0 if pd.isna(inkoop_ruw) else float(inkoop_ruw)
+            verkoop_ruw = row.get("Verkoopprijs (EUR, 0=auto)")
+            verkoop = 0.0 if pd.isna(verkoop_ruw) else float(verkoop_ruw)
+            if naam or inkoop > 0:
+                custom_units.append({"merk_model": naam, "inkoop": inkoop, "verkoop": verkoop})
+        aantal_systemen = max(1, len(custom_units))
+        if not custom_units:
+            st.warning("Vul minstens één toestel in de tabel hierboven in, of voeg er een toe uit de catalogus.")
+
+else:
+    # ============================================================ GEMENGDE INSTALLATIE
+    st.subheader("Systemen")
+    st.caption("Voeg elk apart systeem toe — bv. eerst het multi-split systeem voor de living, dan de losse "
+               "mono-split voor de slaapkamer. Leidingwerk, klein materiaal, arbeid e.d. vul je hieronder "
+               "(bij 'Gedeelde gegevens') één keer in voor de volledige job.")
+
+    if "a_blokken" not in st.session_state:
+        st.session_state["a_blokken"] = []
+
+    with st.expander("➕ Systeem toevoegen", expanded=len(st.session_state["a_blokken"]) == 0):
+        bl1, bl2, bl3 = st.columns(3)
+        with bl1:
+            blok_naam = st.text_input("Naam (bv. 'Living')", key="a_blok_naam")
+        with bl2:
+            blok_type_label = st.selectbox("Type", list(TYPE_OPTIES.keys()), key="a_blok_type")
+        blok_n = TYPE_OPTIES[blok_type_label]
+        with bl3:
+            blok_aantal = st.number_input("Aantal van dit systeem", min_value=1, value=1, step=1, key="a_blok_aantal",
+                help="Bv. 2 losse mono-split airco's van dezelfde grootte in dit blok = hier 2 invullen.")
+
+        with st.expander("📋 Prijs uit Panasonic-catalogus halen (optioneel)"):
+            if blok_n == 1:
+                blok_item = mono_picker("a_blok_cat_mono")
+                st.session_state["_a_blok_cat_mono_item"] = blok_item
+
+                def _vul_blok_mono():
+                    it = st.session_state["_a_blok_cat_mono_item"]
+                    st.session_state["a_blok_merk"] = cat.mono_naam(it)
+                    st.session_state["a_blok_prijs_buiten"] = _inkoop_schatting(it[3])
+                    st.session_state["a_blok_prijs_buiten_verkoop"] = float(it[3])
+
+                st.button("↳ Vul deze prijs in", key="a_blok_cat_mono_btn", on_click=_vul_blok_mono)
             else:
-                st.session_state["a_units_df"] = pd.concat([bestaand, nieuwe_rijen], ignore_index=True)
-            # widget-cache wissen zodat de tabel de nieuwe rijen effectief toont
-            st.session_state.pop("a_units_editor", None)
+                st.markdown("**Buitenunit**")
+                blok_bmodel = multi_buiten_picker("a_blok_cat_buiten")
+                st.session_state["_a_blok_cat_buiten_item"] = blok_bmodel
 
-        st.button("↳ Toevoegen aan tabel", key="a_cat_add_btn", on_click=_voeg_toe)
+                def _vul_blok_buiten():
+                    it = st.session_state["_a_blok_cat_buiten_item"]
+                    st.session_state["a_blok_merk"] = cat.buiten_naam(it)
+                    st.session_state["a_blok_prijs_buiten"] = _inkoop_schatting(it[3])
+                    st.session_state["a_blok_prijs_buiten_verkoop"] = float(it[3])
 
-    default_rows = pd.DataFrame({
-        "Merk & model": pd.Series(dtype="str"),
-        "Inkoopprijs (EUR)": pd.Series(dtype="float"),
-        "Verkoopprijs (EUR, 0=auto)": pd.Series(dtype="float"),
-    })
-    edited = st.data_editor(
-        st.session_state.get("a_units_df", default_rows),
-        num_rows="dynamic", use_container_width=True, key="a_units_editor",
-        column_config={
-            "Inkoopprijs (EUR)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
-            "Verkoopprijs (EUR, 0=auto)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
-        },
-    )
-    st.session_state["a_units_df"] = edited
-    for _, row in edited.iterrows():
-        naam_ruw = row.get("Merk & model")
-        naam = "" if pd.isna(naam_ruw) else str(naam_ruw).strip()
-        inkoop_ruw = row.get("Inkoopprijs (EUR)")
-        inkoop = 0.0 if pd.isna(inkoop_ruw) else float(inkoop_ruw)
-        verkoop_ruw = row.get("Verkoopprijs (EUR, 0=auto)")
-        verkoop = 0.0 if pd.isna(verkoop_ruw) else float(verkoop_ruw)
-        if naam or inkoop > 0:
-            custom_units.append({"merk_model": naam, "inkoop": inkoop, "verkoop": verkoop})
-    aantal_systemen = max(1, len(custom_units))
-    if not custom_units:
-        st.warning("Vul minstens één toestel in de tabel hierboven in, of voeg er een toe uit de catalogus.")
+                st.button("↳ Vul buitenunit-prijs in", key="a_blok_cat_buiten_btn", on_click=_vul_blok_buiten)
+
+                st.markdown("**Binnenunit** (prijs per stuk)")
+                blok_binnen_item = multi_binnen_picker("a_blok_cat_binnen")
+                st.session_state["_a_blok_cat_binnen_item"] = blok_binnen_item
+
+                def _vul_blok_binnen():
+                    it = st.session_state["_a_blok_cat_binnen_item"]
+                    st.session_state["a_blok_prijs_binnen"] = _inkoop_schatting(it[3])
+                    st.session_state["a_blok_prijs_binnen_verkoop"] = float(it[3])
+
+                st.button("↳ Vul binnenunit-prijs in", key="a_blok_cat_binnen_btn", on_click=_vul_blok_binnen)
+
+        pb1, pb2 = st.columns(2)
+        with pb1:
+            if blok_n == 1:
+                blok_prijs_buiten = st.number_input("Inkoopprijs set (EUR)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_buiten")
+                blok_prijs_buiten_verkoop = st.number_input("Verkoopprijs set (EUR, 0=auto)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_buiten_verkoop")
+            else:
+                blok_prijs_buiten = st.number_input("Inkoopprijs buitenunit (EUR)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_buiten")
+                blok_prijs_buiten_verkoop = st.number_input("Verkoopprijs buitenunit (EUR, 0=auto)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_buiten_verkoop")
+        with pb2:
+            if blok_n > 1:
+                blok_prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_binnen")
+                blok_prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0=auto)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_binnen_verkoop")
+            else:
+                blok_prijs_binnen, blok_prijs_binnen_verkoop = 0.0, 0.0
+
+        blok_merk = st.text_input("Merk & model (op offerte)", key="a_blok_merk")
+
+        if st.button("✅ Systeem toevoegen aan offerte", key="a_blok_add_btn"):
+            if blok_prijs_buiten <= 0:
+                st.error("Vul eerst een inkoopprijs in vóór je dit systeem toevoegt.")
+            else:
+                st.session_state["a_blokken"].append(dict(
+                    naam=blok_naam or f"Systeem {len(st.session_state['a_blokken']) + 1}",
+                    type="mono" if blok_n == 1 else "multi", n_binnen=blok_n, aantal_systemen=int(blok_aantal),
+                    merk_model=blok_merk, prijs_buiten=float(blok_prijs_buiten), prijs_buiten_verkoop=float(blok_prijs_buiten_verkoop),
+                    prijs_binnen=float(blok_prijs_binnen), prijs_binnen_verkoop=float(blok_prijs_binnen_verkoop),
+                ))
+                st.rerun()
+
+    if st.session_state["a_blokken"]:
+        st.markdown("**Toegevoegde systemen:**")
+        for i, blok in enumerate(st.session_state["a_blokken"]):
+            rcol1, rcol2 = st.columns([6, 1])
+            with rcol1:
+                typetxt = "Mono-split" if blok["type"] == "mono" else f"Multi-split ({blok['n_binnen']} binnenunits)"
+                st.write(f"**{blok['naam']}** — {typetxt} × {blok['aantal_systemen']} — {blok.get('merk_model', '') or '(geen merk/model)'}")
+            with rcol2:
+                if st.button("🗑️ Verwijder", key=f"a_blok_del_{i}"):
+                    st.session_state["a_blokken"].pop(i)
+                    st.rerun()
+    else:
+        st.warning("Nog geen systemen toegevoegd — voeg er hierboven minstens één toe.")
+
+    blokken = st.session_state["a_blokken"]
+    aantal_systemen = sum(b["aantal_systemen"] for b in blokken) if blokken else 0
+    merk_model = " + ".join(b["naam"] for b in blokken) if blokken else ""
+
+# ================= Gedeelde gegevens (gelden voor de volledige job) =================
+st.subheader("Gedeelde gegevens" if gemengd else "Leidingwerk")
+c5a, c5b = st.columns(2)
+with c5a:
+    leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
+with c5b:
+    goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
+    goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
+        help="Handig als er maar een klein stukje kabelgoot nodig is — de kost wordt dan meegeteld in 'Klein materiaal & bevestiging' in plaats van als eigen regel op de offerte te verschijnen.")
 
 c6, c7, c8 = st.columns(3)
 with c6:
@@ -279,16 +421,26 @@ with st.expander("💶 Korting geven (bv. familie- of volumekorting)"):
 korting_type = {"Geen korting": "geen", "Percentage (%)": "pct", "Vast bedrag (EUR)": "vast"}[korting_keuze]
 
 # ================= Berekening =================
-inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, custom_units=custom_units, merk_model=merk_model, prijs_buiten=prijs_buiten,
-           prijs_buiten_verkoop=prijs_buiten_verkoop,
-           prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
-           leiding_m=leiding_m, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
-           doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
-           console=console, elek=elek, hoogtewerker=hoogtewerker,
-           techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
-           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
-           korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
-res = bereken_airco(inp, P)
+if not gemengd:
+    inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, custom_units=custom_units, merk_model=merk_model, prijs_buiten=prijs_buiten,
+               prijs_buiten_verkoop=prijs_buiten_verkoop,
+               prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
+               leiding_m=leiding_m, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
+               doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
+               console=console, elek=elek, hoogtewerker=hoogtewerker,
+               techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
+               arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
+               korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
+    res = bereken_airco(inp, P)
+else:
+    gedeeld = dict(leiding_m=leiding_m, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
+                   doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
+                   console=console, elek=elek, hoogtewerker=hoogtewerker,
+                   techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
+                   arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
+                   korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
+    res = bereken_airco_gemengd(blokken, gedeeld, P)
+    inp = gedeeld
 
 st.subheader("Offerte-opbouw")
 def _eh(bedrag, unit=""):
@@ -327,15 +479,26 @@ intro = ("Bedankt voor uw vertrouwen in Solvigo Koeltechnieken. Wij installeren 
          "vakkundig en volgens de geldende normen, inclusief vacumeren, lektest en indienststelling. "
          "U geniet van koeling in de zomer en zuinige verwarming in de winter.")
 
-with b1:
+if not gemengd:
     titel_suffix = f" — {aantal_systemen}x apart systeem" if aantal_systemen > 1 else ""
-    pdf_bytes = maak_pdf(f"Airco-installatie — {type_label}{titel_suffix}", klant, res, inp, intro)
+    titel = f"Airco-installatie — {type_label}{titel_suffix}"
+else:
+    titel = "Airco-installatie — Gemengde installatie" + (f" ({', '.join(b['naam'] for b in blokken)})" if blokken else "")
+
+with b1:
+    pdf_bytes = maak_pdf(titel, klant, res, inp, intro)
     st.download_button("📄 Download offerte (PDF)", data=pdf_bytes,
                        file_name=f"{klant['nummer']}_airco.pdf", mime="application/pdf",
                        use_container_width=True)
 
 with b2:
     if st.button("💾 Project bewaren", use_container_width=True):
+        if gemengd:
+            st.session_state["a_blokken_json"] = json.dumps(st.session_state.get("a_blokken", []))
+        if not gemengd and verschillende_toestellen:
+            units_df = st.session_state.get("a_units_df")
+            if units_df is not None and not units_df.empty:
+                st.session_state["a_units_json"] = units_df.to_json(orient="records")
         # Knoppen (eindigen op _btn) en andere widget-interne/niet-scalaire status
         # mogen NOOIT herladen worden in st.session_state — dat geeft een Streamlit-fout.
         payload = {k.replace("a_", "", 1): v for k, v in st.session_state.items()
