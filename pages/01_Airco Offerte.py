@@ -405,9 +405,12 @@ else:
 
         if st.button("✅ Systeem toevoegen aan offerte", key="a_blok_add_btn"):
             if blok_prijs_buiten <= 0:
-                st.error("Vul eerst een inkoopprijs in vóór je dit systeem toevoegt.")
+                st.error("Vul eerst een inkoopprijs voor de buitenunit in vóór je dit systeem toevoegt.")
             elif blok_n > 1 and blok_verschillende_binnen and not blok_custom_binnen:
                 st.error("Voeg minstens één binnenunit toe aan de tabel.")
+            elif blok_n > 1 and not blok_verschillende_binnen and blok_prijs_binnen <= 0:
+                st.error("Vul ook een inkoopprijs voor de binnenunit in vóór je dit systeem toevoegt "
+                         "(nu nog op € 0 — vergeten in te vullen of de catalogus-knop niet aangeklikt?).")
             else:
                 nieuw_blok = dict(
                     naam=blok_naam or f"Systeem {len(st.session_state['a_blokken']) + 1}",
