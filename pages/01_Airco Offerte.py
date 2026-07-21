@@ -505,6 +505,11 @@ with b2:
                    if k.startswith("a_") and not k.endswith("_btn")
                    and isinstance(v, (str, int, float, bool))}
         payload["_type"] = "airco"
-        pid = save_project("Airco", klantnaam or bedrijf, res["totaal"], payload,
-                          mat_inkoop=res.get("mat_inkoop", 0), netto_winst=res.get("winst", 0))
+        try:
+            pid = save_project("Airco", klantnaam or bedrijf, res["totaal"], payload,
+                              mat_inkoop=res.get("mat_inkoop", 0), netto_winst=res.get("winst", 0))
+        except TypeError:
+            # Vangnet: als storage.py nog een oudere versie is (zonder mat_inkoop/netto_winst-
+            # parameters), toch gewoon opslaan zonder die twee extra velden i.p.v. te crashen.
+            pid = save_project("Airco", klantnaam or bedrijf, res["totaal"], payload)
         st.success(f"Bewaard als project {pid} — terug te vinden onder **Projecten**.")
