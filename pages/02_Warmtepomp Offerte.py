@@ -150,5 +150,6 @@ with b2:
                    if k.startswith("w_") and not k.endswith("_btn")
                    and isinstance(v, (str, int, float, bool))}
         payload["_type"] = "wp"
-        pid = save_project("Warmtepomp", klantnaam or bedrijf, res["totaal"], payload)
+        pid = save_project("Warmtepomp", klantnaam or bedrijf, res["totaal"], payload,
+                          mat_inkoop=res.get("mat_inkoop", 0), netto_winst=res.get("winst", 0))
         st.success(f"Bewaard als project {pid} — terug te vinden onder **Projecten**.")

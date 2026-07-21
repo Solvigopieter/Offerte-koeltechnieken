@@ -32,6 +32,8 @@ for p in sorted(projecten, key=lambda x: str(x.get("id", "")), reverse=True):
         c1.caption(p.get("datum", ""))
         c2.markdown(f"{'❄️ Airco' if p.get('type') == 'Airco' else '🔥 Warmtepomp'}")
         c3.markdown(f"**€ {_naar_bedrag(p.get('totaal_incl', 0)):,.2f}".replace(",", " ") + "** incl. BTW")
+        c3.caption(f"Materiaal: € {_naar_bedrag(p.get('mat_inkoop', 0)):,.2f}".replace(",", " ")
+                   + f"  ·  Netto: € {_naar_bedrag(p.get('netto_winst', 0)):,.2f}".replace(",", " "))
 
         if c4.button("Openen", key=f"open_{p['id']}", use_container_width=True):
             try:

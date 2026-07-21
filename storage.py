@@ -12,7 +12,7 @@ import streamlit as st
 
 LOCAL_FILE = "pr_data.json"
 
-PROJECT_HEADERS = ["id", "datum", "type", "klant", "totaal_incl", "payload"]
+PROJECT_HEADERS = ["id", "datum", "type", "klant", "totaal_incl", "mat_inkoop", "netto_winst", "payload"]
 
 
 # ---------------------------------------------------------------- helpers
@@ -45,6 +45,15 @@ def _ws(title: str, headers: list[str]):
     sh = _sheet()
     try:
         ws = sh.worksheet(title)
+        # Synchroniseer ontbrekende kolommen op een reeds bestaand werkblad
+        # (bv. bij een app-update die nieuwe velden toevoegt).
+        try:
+            huidige = ws.row_values(1)
+            ontbrekend = [h for h in headers if h not in huidige]
+            if ontbrekend:
+                ws.update(values=[huidige + ontbrekend], range_name="A1")
+        except Exception:
+            pass
     except Exception:
         ws = sh.add_worksheet(title=title, rows=200, cols=len(headers) + 2)
         ws.append_row(headers)
@@ -131,7 +140,8 @@ def save_prijzen(prijzen: dict):
 
 
 # ---------------------------------------------------------------- projecten
-def save_project(ptype: str, klant: str, totaal_incl: float, payload: dict) -> str:
+def save_project(ptype: str, klant: str, totaal_incl: float, payload: dict,
+                  mat_inkoop: float = 0.0, netto_winst: float = 0.0) -> str:
     pid = datetime.now().strftime("%Y%m%d-%H%M%S")
     rec = {
         "id": pid,
@@ -139,12 +149,21 @@ def save_project(ptype: str, klant: str, totaal_incl: float, payload: dict) -> s
         "type": ptype,
         "klant": klant or "(naamloos)",
         "totaal_incl": round(totaal_incl, 2),
+        "mat_inkoop": round(mat_inkoop, 2),
+        "netto_winst": round(netto_winst, 2),
         "payload": json.dumps(payload, ensure_ascii=False),
     }
     if _use_gsheets():
         ws = _ws("Projecten", PROJECT_HEADERS)
-        # totaal_incl expliciet als forced-text wegschrijven (zie _naar_getal_tekst)
-        rij = [rec[h] if h != "totaal_incl" else _naar_getal_tekst(rec[h]) for h in PROJECT_HEADERS]
+        # Schrijf in de WERKELIJKE kolomvolgorde van het blad (niet zomaar de
+        # volgorde van PROJECT_HEADERS) — zo kan dit nooit verschuiven,
+        # ook niet op een reeds bestaand blad met een andere kolomvolgorde.
+        werkelijke_headers = ws.row_values(1) or PROJECT_HEADERS
+        geld_velden = {"totaal_incl", "mat_inkoop", "netto_winst"}
+        rij = [
+            _naar_getal_tekst(rec.get(h, "")) if h in geld_velden else rec.get(h, "")
+            for h in werkelijke_headers
+        ]
         ws.append_row(rij)
     else:
         data = _local_load()
@@ -161,10 +180,11 @@ def load_projecten() -> list[dict]:
         except Exception as e:
             st.warning(f"Kon projecten niet laden: {e}")
             return []
-        # totaal_incl altijd robuust naar een echt getal omzetten, ongeacht
-        # hoe het precies is opgeslagen (zie _naar_bedrag).
+        # Geldbedragen altijd robuust naar een echt getal omzetten, ongeacht
+        # hoe precies opgeslagen (zie _naar_bedrag).
         for p in projecten:
-            p["totaal_incl"] = _naar_bedrag(p.get("totaal_incl"))
+            for veld in ("totaal_incl", "mat_inkoop", "netto_winst"):
+                p[veld] = _naar_bedrag(p.get(veld))
         return projecten
     return _local_load().get("projecten", [])
 
