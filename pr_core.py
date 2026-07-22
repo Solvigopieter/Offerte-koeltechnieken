@@ -758,32 +758,36 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         "hiervan kennis te hebben genomen en deze te aanvaarden."))
 
     # --- Handtekeningvakken ---
-    # Controleer EERST of dit blok nog past op de huidige pagina. Zonder deze
-    # check kan fpdf2's automatische pagina-afbreking het blok halverwege
-    # afbreken (bv. bij een lange offerte met veel regels), waardoor er een
-    # extra, grotendeels blanco pagina ontstaat vóór de voorwaarden-pagina.
-    BENODIGDE_RUIMTE_HANDTEKENING = 32  # mm: ln(9) + lijnen op +16 + tekst tot +23 + marge
+    # Controleer eerst of dit blok nog past op de huidige pagina.
+    BENODIGDE_RUIMTE_HANDTEKENING = 40  # mm, met ruime marge
     PAGINA_HOOGTE_A4 = 297
     ONDERMARGE = 18
     if pdf.get_y() + BENODIGDE_RUIMTE_HANDTEKENING > (PAGINA_HOOGTE_A4 - ONDERMARGE):
         pdf.add_page()
         pdf.set_y(20)
 
+    # Belangrijk: hierna GEEN vaste 'y_box + N'-coördinaten meer gebruiken voor
+    # opeenvolgende cellen. Als daar ooit toch een paginabreuk zou optreden,
+    # springen latere cellen anders terug naar een voorbijgestreefd coördinaat
+    # op de nieuwe pagina en breekt elke cel na elkaar apart af (3 losse
+    # bijna-blanco pagina's). Met ln=1 / set_x (niet set_xy) volgt de cursor
+    # gewoon natuurlijk, ook als er onverhoopt toch een break zou gebeuren.
     pdf.ln(9)
     pdf.set_draw_color(224, 226, 231)
     pdf.set_line_width(0.3)
-    y_box = pdf.get_y()
-    pdf.line(12, y_box + 16, 90, y_box + 16)
-    pdf.line(120, y_box + 16, 198, y_box + 16)
+    y_lijn = pdf.get_y()
+    pdf.line(12, y_lijn, 90, y_lijn)
+    pdf.line(120, y_lijn, 198, y_lijn)
+    pdf.ln(2)
     pdf.set_font(F, "", 9)
     pdf.set_text_color(90, 90, 90)
-    pdf.set_xy(12, y_box + 18)
+    pdf.set_x(12)
     pdf.cell(78, 5, "Voor akkoord, de klant")
-    pdf.set_xy(120, y_box + 18)
-    pdf.cell(0, 5, "Solvigo Koeltechnieken")
+    pdf.set_x(120)
+    pdf.cell(0, 5, "Solvigo Koeltechnieken", ln=1)
     pdf.set_font(F, "", 7.5)
     pdf.set_text_color(150, 150, 150)
-    pdf.set_xy(12, y_box + 23)
+    pdf.set_x(12)
     pdf.cell(78, 4, "(datum + handtekening, voorafgegaan door 'gelezen en goedgekeurd')")
 
     # ================= PAGINA 2 (of later): ALGEMENE VOORWAARDEN =================
