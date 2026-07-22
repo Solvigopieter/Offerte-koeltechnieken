@@ -758,6 +758,17 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         "hiervan kennis te hebben genomen en deze te aanvaarden."))
 
     # --- Handtekeningvakken ---
+    # Controleer EERST of dit blok nog past op de huidige pagina. Zonder deze
+    # check kan fpdf2's automatische pagina-afbreking het blok halverwege
+    # afbreken (bv. bij een lange offerte met veel regels), waardoor er een
+    # extra, grotendeels blanco pagina ontstaat vóór de voorwaarden-pagina.
+    BENODIGDE_RUIMTE_HANDTEKENING = 32  # mm: ln(9) + lijnen op +16 + tekst tot +23 + marge
+    PAGINA_HOOGTE_A4 = 297
+    ONDERMARGE = 18
+    if pdf.get_y() + BENODIGDE_RUIMTE_HANDTEKENING > (PAGINA_HOOGTE_A4 - ONDERMARGE):
+        pdf.add_page()
+        pdf.set_y(20)
+
     pdf.ln(9)
     pdf.set_draw_color(224, 226, 231)
     pdf.set_line_width(0.3)
@@ -775,7 +786,10 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_xy(12, y_box + 23)
     pdf.cell(78, 4, "(datum + handtekening, voorafgegaan door 'gelezen en goedgekeurd')")
 
-    # ================= PAGINA 2: ALGEMENE VOORWAARDEN =================
+    # ================= PAGINA 2 (of later): ALGEMENE VOORWAARDEN =================
+    # Altijd een NIEUWE pagina voor de voorwaarden, ongeacht hoeveel pagina's
+    # de offerte zelf al in beslag nam (nooit blindelings ervan uitgaan dat
+    # dit toevallig pagina 2 is).
     pdf.add_page()
     pdf.set_font(F, "B", 14)
     pdf.set_text_color(*NAVY)
