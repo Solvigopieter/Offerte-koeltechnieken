@@ -151,8 +151,7 @@ def _leiding_regel(leiding_m: float, leiding_type: str, P: dict):
     aantal_rollen = math.ceil(leiding_m / rol_m)
     aangerekende_m = aantal_rollen * rol_m
     inkoop_totaal = aangerekende_m * prijs_pm
-    rol_tekst = "1 rol" if aantal_rollen == 1 else f"{aantal_rollen} rollen"
-    aantal_tekst = f"{rol_tekst} ({aangerekende_m:.0f}m, {leiding_m:g}m nodig)"
+    aantal_tekst = "1 rol" if aantal_rollen == 1 else f"{aantal_rollen} rollen"
     return omschrijving, aantal_tekst, inkoop_totaal, aangerekende_m
 
 
