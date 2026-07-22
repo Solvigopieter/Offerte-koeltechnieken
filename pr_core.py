@@ -114,7 +114,14 @@ def eenheid_label(aantal_tekst: str) -> str:
     gebruikt — daar staat gewoon het bedrag."""
     if not aantal_tekst:
         return ""
-    parts = aantal_tekst.strip().split(None, 1)
+    # Speciaal geval: koelleidingen worden per rol AANGEREKEND, maar de
+    # eenheidsprijs die hierbij hoort is een prijs per METER (zie
+    # _leiding_regel) — dus "/rol" zou hier het verkeerde, veel te hoge
+    # bedrag suggereren. "1 rol" / "2 rollen" moet dus altijd "/m" geven.
+    tekst = aantal_tekst.strip()
+    if tekst == "1 rol" or tekst.endswith(" rollen"):
+        return "/m"
+    parts = tekst.split(None, 1)
     if len(parts) < 2:
         return ""
     return f"/{parts[1].strip()}"
