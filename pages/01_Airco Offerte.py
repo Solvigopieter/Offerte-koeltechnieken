@@ -25,7 +25,7 @@ st.title("❄️ Airco Offerte")
 loaded = st.session_state.pop("load_project", None)
 if loaded and loaded.get("_type") == "airco":
     for k, v in loaded.items():
-        if not k.startswith("_") and not k.endswith("_btn"):
+        if not k.startswith("_") and "_btn" not in k:
             st.session_state[f"a_{k}"] = v
     if "a_blokken_json" in st.session_state:
         try:
@@ -438,7 +438,7 @@ else:
                 typetxt = "Mono-split" if blok["type"] == "mono" else f"Multi-split ({blok['n_binnen']} binnenunits)"
                 st.write(f"**{blok['naam']}** — {typetxt} × {blok['aantal_systemen']} — {blok.get('merk_model', '') or '(geen merk/model)'}")
             with rcol2:
-                if st.button("🗑️ Verwijder", key=f"a_blok_del_{i}"):
+                if st.button("🗑️ Verwijder", key=f"a_blok_del_btn_{i}"):
                     st.session_state["a_blokken"].pop(i)
                     st.rerun()
     else:
@@ -574,7 +574,7 @@ with b2:
         # Knoppen (eindigen op _btn) en andere widget-interne/niet-scalaire status
         # mogen NOOIT herladen worden in st.session_state — dat geeft een Streamlit-fout.
         payload = {k.replace("a_", "", 1): v for k, v in st.session_state.items()
-                   if k.startswith("a_") and not k.endswith("_btn")
+                   if k.startswith("a_") and "_btn" not in k
                    and isinstance(v, (str, int, float, bool))}
         payload["_type"] = "airco"
         try:
