@@ -456,12 +456,13 @@ with c5a:
     leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
     leiding_type_label = st.selectbox(
         "Type koelleiding",
-        ["Geïsoleerd (bv. voor binnen)", "Niet-geïsoleerd", "Combi (beide leidingen samen/gebundeld)"],
+        ["Geïsoleerd (bv. gasleiding)", "Niet-geïsoleerd (bv. vloeistofleiding)", "Combi"],
         key="a_leiding_type_label",
-        help="Combi = 1 gebundeld product met beide leidingen samen — wordt maar 1x per rol "
-             "aangerekend voor de volledige lengte, niet apart voor geïsoleerd én niet-geïsoleerd.")
-    leiding_type = {"Geïsoleerd (bv. voor binnen)": "geisoleerd", "Niet-geïsoleerd": "niet_geisoleerd",
-                    "Combi (beide leidingen samen/gebundeld)": "combi"}[leiding_type_label]
+        help="Combi = 1 rol met een eigen prijs per meter (tussen geïsoleerd en niet-geïsoleerd "
+             "in — instelbaar bij Prijsinstellingen), voor als je in de praktijk 1 gezamenlijke "
+             "rol/product gebruikt in plaats van 2 aparte.")
+    leiding_type = {"Geïsoleerd (bv. gasleiding)": "geisoleerd", "Niet-geïsoleerd (bv. vloeistofleiding)": "niet_geisoleerd",
+                    "Combi": "combi"}[leiding_type_label]
     _rol_m = P.get("a_leiding_rol_m", 30.0)
     if leiding_m > 0:
         _aantal_rollen = math.ceil(leiding_m / _rol_m)

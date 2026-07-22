@@ -23,7 +23,7 @@ DEFAULT_PRIJZEN = {
     # Airco
     "a_leiding_geisoleerd_pm": 5.9,      # koperleiding geïsoleerd, per meter (inkoop)
     "a_leiding_niet_geisoleerd_pm": 4.7, # koperleiding niet-geïsoleerd, per meter (inkoop)
-    "a_leiding_combi_pm": 10.6,          # combi (beide leidingen samen/gebundeld), per meter (inkoop)
+    "a_leiding_combi_pm": 5.3,           # combi (gezamenlijk product), per meter (inkoop) — tussen de 2 in, geen som
     "a_leiding_rol_m": 30.0,             # standaard rollengte — er wordt per volledige rol aangerekend
     "a_goot_pm": 22.0,            # sierlijst per meter (inkoop)
     "a_klein_basis": 60.0,        # klein materiaal basis
@@ -71,7 +71,7 @@ PRIJS_LABELS = {
     "minimum_tarief": "Minimumtarief offerte excl. BTW (EUR)",
     "a_leiding_geisoleerd_pm": "Airco: koperleiding geïsoleerd per meter (EUR, inkoop)",
     "a_leiding_niet_geisoleerd_pm": "Airco: koperleiding niet-geïsoleerd per meter (EUR, inkoop)",
-    "a_leiding_combi_pm": "Airco: koperleiding combi (beide samen) per meter (EUR, inkoop)",
+    "a_leiding_combi_pm": "Airco: koperleiding combi per meter (EUR, inkoop) — tussen geïsoleerd en niet-geïsoleerd in",
     "a_leiding_rol_m": "Airco: standaard rollengte koperleiding (m) — wordt per volledige rol aangerekend",
     "a_goot_pm": "Airco: sierlijst per meter (EUR, inkoop)",
     "a_klein_basis": "Airco: klein materiaal basis (EUR)",
@@ -130,9 +130,10 @@ def _vk(inkoop: float, verkoop_override: float, marge: float) -> float:
 
 def _leiding_regel(leiding_m: float, leiding_type: str, P: dict):
     """Berekent de koelleiding-kost, aangerekend per VOLLEDIGE rol (standaard 30m),
-    nooit per losse meter. Bij 'combi' (beide leidingen samen/gebundeld in 1 product)
-    wordt maar 1x het aantal rollen aangerekend voor de volledige lengte — niet
-    per ongeluk apart voor 'geïsoleerd' én 'niet-geïsoleerd' (dat zou 2x zo duur zijn).
+    nooit per losse meter. 'Combi' is een gezamenlijk leidingproduct (geïsoleerd +
+    niet-geïsoleerd samen aangeboden/verwerkt) met een eigen prijs per meter,
+    ergens tussen de losse geïsoleerde en niet-geïsoleerde prijs in — dus NIET de
+    som van beide, en er wordt maar 1 rol aangerekend, niet 2.
 
     Geeft terug: (omschrijving, aantal-tekst, inkoop-totaal, aantal_num-voor-eenheidsprijs)
     """
@@ -140,7 +141,7 @@ def _leiding_regel(leiding_m: float, leiding_type: str, P: dict):
     prijs_per_type = {
         "geisoleerd": ("Koelleidingen (geïsoleerd)", P["a_leiding_geisoleerd_pm"]),
         "niet_geisoleerd": ("Koelleidingen (niet-geïsoleerd)", P["a_leiding_niet_geisoleerd_pm"]),
-        "combi": ("Koelleidingen (combi — beide leidingen samen)", P["a_leiding_combi_pm"]),
+        "combi": ("Koelleidingen (combi)", P["a_leiding_combi_pm"]),
     }
     omschrijving, prijs_pm = prijs_per_type.get(leiding_type, prijs_per_type["geisoleerd"])
 
