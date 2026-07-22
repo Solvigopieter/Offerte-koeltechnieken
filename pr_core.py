@@ -1,5 +1,6 @@
 # pr_core.py — gedeelde prijzen, berekeningen en PDF voor Solvigo Koeltechnieken
 import io
+import math
 import os
 import re
 from datetime import date
@@ -20,7 +21,10 @@ DEFAULT_PRIJZEN = {
     "minimum_tarief": 350.0,      # minimum offertebedrag excl. BTW
 
     # Airco
-    "a_leiding_pm": 18.0,         # koelleiding set per meter (geïsoleerd, inkoop)
+    "a_leiding_geisoleerd_pm": 5.9,      # koperleiding geïsoleerd, per meter (inkoop)
+    "a_leiding_niet_geisoleerd_pm": 4.7, # koperleiding niet-geïsoleerd, per meter (inkoop)
+    "a_leiding_combi_pm": 10.6,          # combi (beide leidingen samen/gebundeld), per meter (inkoop)
+    "a_leiding_rol_m": 30.0,             # standaard rollengte — er wordt per volledige rol aangerekend
     "a_goot_pm": 22.0,            # sierlijst per meter (inkoop)
     "a_klein_basis": 60.0,        # klein materiaal basis
     "a_klein_per_unit": 25.0,     # klein materiaal per binnenunit
@@ -65,7 +69,10 @@ PRIJS_LABELS = {
     "km_prijs": "Kilometerprijs (EUR/km, enkel)",
     "vast_dossier": "Vast dossier-/opstartbedrag (EUR)",
     "minimum_tarief": "Minimumtarief offerte excl. BTW (EUR)",
-    "a_leiding_pm": "Airco: koelleiding per meter (EUR, inkoop)",
+    "a_leiding_geisoleerd_pm": "Airco: koperleiding geïsoleerd per meter (EUR, inkoop)",
+    "a_leiding_niet_geisoleerd_pm": "Airco: koperleiding niet-geïsoleerd per meter (EUR, inkoop)",
+    "a_leiding_combi_pm": "Airco: koperleiding combi (beide samen) per meter (EUR, inkoop)",
+    "a_leiding_rol_m": "Airco: standaard rollengte koperleiding (m) — wordt per volledige rol aangerekend",
     "a_goot_pm": "Airco: sierlijst per meter (EUR, inkoop)",
     "a_klein_basis": "Airco: klein materiaal basis (EUR)",
     "a_klein_per_unit": "Airco: klein materiaal per binnenunit (EUR)",
@@ -121,6 +128,33 @@ def _vk(inkoop: float, verkoop_override: float, marge: float) -> float:
     return verkoop_override if verkoop_override and verkoop_override > 0 else inkoop * marge
 
 
+def _leiding_regel(leiding_m: float, leiding_type: str, P: dict):
+    """Berekent de koelleiding-kost, aangerekend per VOLLEDIGE rol (standaard 30m),
+    nooit per losse meter. Bij 'combi' (beide leidingen samen/gebundeld in 1 product)
+    wordt maar 1x het aantal rollen aangerekend voor de volledige lengte — niet
+    per ongeluk apart voor 'geïsoleerd' én 'niet-geïsoleerd' (dat zou 2x zo duur zijn).
+
+    Geeft terug: (omschrijving, aantal-tekst, inkoop-totaal, aantal_num-voor-eenheidsprijs)
+    """
+    rol_m = P.get("a_leiding_rol_m", 30.0) or 30.0
+    prijs_per_type = {
+        "geisoleerd": ("Koelleidingen (geïsoleerd)", P["a_leiding_geisoleerd_pm"]),
+        "niet_geisoleerd": ("Koelleidingen (niet-geïsoleerd)", P["a_leiding_niet_geisoleerd_pm"]),
+        "combi": ("Koelleidingen (combi — beide leidingen samen)", P["a_leiding_combi_pm"]),
+    }
+    omschrijving, prijs_pm = prijs_per_type.get(leiding_type, prijs_per_type["geisoleerd"])
+
+    if leiding_m <= 0:
+        return omschrijving, "0 m", 0.0, 1
+
+    aantal_rollen = math.ceil(leiding_m / rol_m)
+    aangerekende_m = aantal_rollen * rol_m
+    inkoop_totaal = aangerekende_m * prijs_pm
+    rol_tekst = "1 rol" if aantal_rollen == 1 else f"{aantal_rollen} rollen"
+    aantal_tekst = f"{rol_tekst} ({aangerekende_m:.0f}m, {leiding_m:g}m nodig)"
+    return omschrijving, aantal_tekst, inkoop_totaal, aangerekende_m
+
+
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
     n = inp["n_binnen"]                       # binnenunits per systeem
@@ -166,7 +200,8 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         eenheid = verkoop_totaal / aantal_num if aantal_num else verkoop_totaal
         mat.append((om, aantal, inkoop_totaal, verkoop_totaal, eenheid))
 
-    std("Koelleidingen (geïsoleerd)", f"{inp['leiding_m']} m", inp["leiding_m"] * P["a_leiding_pm"], aantal_num=inp["leiding_m"] or 1)
+    _lo, _la, _li, _lm = _leiding_regel(inp["leiding_m"], inp.get("leiding_type", "geisoleerd"), P)
+    std(_lo, _la, _li, aantal_num=_lm)
 
     goot_inkoop = inp["goot_m"] * P["a_goot_pm"]
     goot_bij_klein = inp.get("goot_bij_klein", False)
@@ -320,7 +355,8 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
         eenheid = verkoop_totaal / aantal_num if aantal_num else verkoop_totaal
         mat.append((om, aantal_txt, inkoop_totaal, verkoop_totaal, eenheid))
 
-    std("Koelleidingen (geïsoleerd)", f"{gedeeld['leiding_m']} m", gedeeld["leiding_m"] * P["a_leiding_pm"], aantal_num=gedeeld["leiding_m"] or 1)
+    _lo, _la, _li, _lm = _leiding_regel(gedeeld["leiding_m"], gedeeld.get("leiding_type", "geisoleerd"), P)
+    std(_lo, _la, _li, aantal_num=_lm)
 
     goot_inkoop = gedeeld["goot_m"] * P["a_goot_pm"]
     goot_bij_klein = gedeeld.get("goot_bij_klein", False)

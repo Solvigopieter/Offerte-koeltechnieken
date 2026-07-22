@@ -11,6 +11,7 @@ require_login()
 
 from datetime import date, timedelta
 import json
+import math
 import pandas as pd
 
 from pr_core import DEFAULT_PRIJZEN, bereken_airco, bereken_airco_gemengd, maak_pdf, gen_offertenummer, eenheid_label
@@ -453,6 +454,19 @@ st.subheader("Gedeelde gegevens" if gemengd else "Leidingwerk")
 c5a, c5b = st.columns(2)
 with c5a:
     leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
+    leiding_type_label = st.selectbox(
+        "Type koelleiding",
+        ["Geïsoleerd (bv. voor binnen)", "Niet-geïsoleerd", "Combi (beide leidingen samen/gebundeld)"],
+        key="a_leiding_type_label",
+        help="Combi = 1 gebundeld product met beide leidingen samen — wordt maar 1x per rol "
+             "aangerekend voor de volledige lengte, niet apart voor geïsoleerd én niet-geïsoleerd.")
+    leiding_type = {"Geïsoleerd (bv. voor binnen)": "geisoleerd", "Niet-geïsoleerd": "niet_geisoleerd",
+                    "Combi (beide leidingen samen/gebundeld)": "combi"}[leiding_type_label]
+    _rol_m = P.get("a_leiding_rol_m", 30.0)
+    if leiding_m > 0:
+        _aantal_rollen = math.ceil(leiding_m / _rol_m)
+        st.caption(f"→ {leiding_m:g}m nodig ⇒ {_aantal_rollen} rol(len) van {_rol_m:g}m "
+                  f"= {_aantal_rollen * _rol_m:.0f}m aangerekend.")
 with c5b:
     goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
     goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
@@ -497,7 +511,7 @@ if not gemengd:
     inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, custom_units=custom_units, merk_model=merk_model, prijs_buiten=prijs_buiten,
                prijs_buiten_verkoop=prijs_buiten_verkoop,
                prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
-               leiding_m=leiding_m, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
+               leiding_m=leiding_m, leiding_type=leiding_type, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
                doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
                console=console, elek=elek, hoogtewerker=hoogtewerker,
                techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
@@ -505,7 +519,7 @@ if not gemengd:
                korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
     res = bereken_airco(inp, P)
 else:
-    gedeeld = dict(leiding_m=leiding_m, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
+    gedeeld = dict(leiding_m=leiding_m, leiding_type=leiding_type, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
                    doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
                    console=console, elek=elek, hoogtewerker=hoogtewerker,
                    techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
