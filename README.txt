@@ -12,11 +12,35 @@ Structuur
 - auth.py                         → wachtwoordscherm (APP_PASSWORD in Secrets)
 - pr_core.py                      → prijzen, berekeningen, PDF-generatie
 - storage.py                      → opslag: Google Sheets óf lokaal JSON
+- crm_koppeling.py                → "Verstuur naar CRM"-knop: maakt rechtstreeks een
+                                     klant + deal + offerte aan in de Koeltechnieken CRM-sheet
 - pages/01_Airco Offerte.py
 - pages/02_Warmtepomp Offerte.py
 - pages/03_Projecten.py
 - pages/04_Prijsinstellingen.py
 - assets/logo.png                 → Solvigo Koeltechnieken-logo (staat er al in, komt in de PDF-header)
+
+"Verstuur naar CRM"-knop activeren
+-----------------------------------
+Op elke offertepagina staat naast "Download PDF" en "Project bewaren" ook een
+knop "📤 Verstuur naar CRM". Die maakt automatisch een klant (of hergebruikt een
+bestaande, op naam), een deal (stadium "Offerte verstuurd") en een gekoppelde
+offerte aan in de Koeltechnieken CRM — meteen zichtbaar in de Pipeline daar,
+zonder dat je nog iets in het CRM zelf moet doen.
+
+Om dit te activeren, voeg één extra regel toe aan de Secrets van de
+offertegenerator-app (het [gcp_service_account]-blok heb je al, dat wordt
+hergebruikt):
+
+    crm_sheet_id = "ID_VAN_DE_KOELTECHNIEKEN_CRM_GOOGLE_SHEET"
+
+Dat ID vind je in de URL van de CRM-sheet (het stuk tussen /d/ en /edit).
+Zorg dat die sheet gedeeld is met hetzelfde service-account e-mailadres
+(client_email uit [gcp_service_account]) met Editor-rechten — normaal al het
+geval, want dat is dezelfde sheet die het CRM zelf gebruikt.
+
+Zonder deze regel blijft de knop gewoon zichtbaar maar uitgeschakeld (grijs),
+de rest van de app werkt onveranderd verder.
 
 VOOR JE START: website en e-mailadres in pr_core.py (blok BEDRIJFSINFO) staan nog
 op de tijdelijke Solvigo-waarden (www.solvigo.be / cleaning@solvigo.be) — TODO:

@@ -127,7 +127,8 @@ m4.metric("Geschatte brutomarge", f"€ {res['winst']:,.2f}".replace(",", " "))
 
 # ================= Export & bewaren =================
 st.divider()
-b1, b2 = st.columns(2)
+import crm_koppeling
+b1, b2, b3 = st.columns(3)
 
 klant = dict(naam=klantnaam, bedrijf=bedrijf, adres=adres, email=email, tel=tel,
              datum=offertedatum, verloop=verloopdatum,
@@ -156,3 +157,25 @@ with b2:
         except TypeError:
             pid = save_project("Warmtepomp", klantnaam or bedrijf, res["totaal"], payload)
         st.success(f"Bewaard als project {pid} — terug te vinden onder **Projecten**.")
+
+with b3:
+    if not crm_koppeling.crm_koppeling_beschikbaar():
+        st.button("📤 Verstuur naar CRM", use_container_width=True, disabled=True,
+                 help="Niet beschikbaar: zet 'crm_sheet_id' in de Secrets (zie README) om dit te activeren.")
+    elif st.button("📤 Verstuur naar CRM", use_container_width=True, type="primary",
+                  help="Maakt automatisch een klant + deal + offerte aan in het CRM, meteen zichtbaar in Pipeline."):
+        if not (klantnaam or bedrijf).strip():
+            st.error("Vul minstens een klantnaam of bedrijfsnaam in.")
+        else:
+            try:
+                resultaat = crm_koppeling.verstuur_naar_crm(
+                    klantnaam=klantnaam or bedrijf, adres=adres, email=email, tel=tel,
+                    offerte_type="Warmtepomp", totaal=res["totaal"],
+                    mat_inkoop=res.get("mat_inkoop", 0), winst=res.get("winst", 0),
+                    offertenummer=klant["nummer"], btw_tarief=f"{int(btw*100)}%")
+                extra = " (bestaande klant hergebruikt)" if resultaat["organisatie_hergebruikt"] else \
+                        f" (nieuwe klant {resultaat['klantnummer']} aangemaakt)"
+                st.success(f"✅ Verstuurd naar CRM{extra} — {resultaat['klantnaam']} staat nu in de Pipeline "
+                          f"bij 'Offerte verstuurd', met deze offerte gekoppeld.")
+            except Exception as e:
+                st.error(f"Versturen naar CRM mislukt: {e}")
