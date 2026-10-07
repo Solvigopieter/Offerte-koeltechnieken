@@ -185,7 +185,7 @@ def materiaal_regels(materialen: list, marge: float, weergave: str = "artikel") 
                        hoeveelheid * inkoop_eenheid, hoeveelheid * vk_eenheid, vk_eenheid))
 
     if weergave == "totaal" and lijnen:
-        return [("Installatiemateriaal (leidingen, goten, bevestiging, klein materiaal)", "",
+        return [("Installatiemateriaal", "",
                  sum(l[3] for l in lijnen), sum(l[4] for l in lijnen), sum(l[4] for l in lijnen))]
     if weergave == "categorie":
         per_cat = {}
@@ -799,7 +799,16 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         if idx % 2 == 1:
             pdf.set_fill_color(*GREY)
             pdf.rect(12, pdf.get_y(), 186, 7, "F")
-        pdf.cell(110, 7, S(om)[:68])
+        # Lange omschrijving: eerst kleiner lettertype proberen, pas als laatste redmiddel inkorten
+        tekst = S(om)
+        grootte = 9.5
+        while pdf.get_string_width(tekst) > 107 and grootte > 7.5:
+            grootte -= 0.5
+            pdf.set_font(F, "", grootte)
+        while pdf.get_string_width(tekst) > 107 and len(tekst) > 4:
+            tekst = tekst[:-4].rstrip() + "..."
+        pdf.cell(110, 7, tekst)
+        pdf.set_font(F, "", 9.5)
         pdf.cell(35, 7, S(aantal), align="C")
         pdf.cell(41, 7, f"{bedrag:,.2f}".replace(",", " "), align="R")
         pdf.ln(7)
@@ -811,11 +820,11 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         row(om, aantal, verkoop)
 
     if res.get("arbeid_aanrekenen", True):
-        row(f"Installatie & indienststelling ({res['uren']:.1f} u x {inp['techniekers']} technieker(s))", "", res["arbeid"])
+        row("Installatie & indienststelling", "", res["arbeid"])
     # indien arbeid niet apart aangerekend wordt: geen regel op de offerte
 
     if res["km_kost"] > 0:
-        row("Verplaatsing", f"{inp['km']} km", res["km_kost"])
+        row("Verplaatsing", f"{inp['km']:g} km", res["km_kost"])
     if res.get("dossier_aanrekenen", True):
         row("Dossier & opstart", "", res["vast"])
     if res["extra_hoogte"] > 0:
