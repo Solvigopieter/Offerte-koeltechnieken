@@ -13,9 +13,12 @@ from datetime import date, timedelta
 import pandas as pd
 
 from pr_core import DEFAULT_PRIJZEN, bereken_wp, maak_pdf, gen_offertenummer, eenheid_label
-from storage import load_prijzen, save_project
+from storage import load_prijzen, save_project, load_materialen
+import materialen as matlijst
 
 P = load_prijzen(DEFAULT_PRIJZEN)
+MATERIALEN = load_materialen()
+MAT_MODI = ["📦 Gedetailleerd (materiaallijst)", "⚡ Snel (forfaitair)"]
 
 st.title("🔥 Lucht-water Warmtepomp Offerte")
 
@@ -24,6 +27,9 @@ if loaded and loaded.get("_type") == "wp":
     for k, v in loaded.items():
         if not k.startswith("_") and "_btn" not in k:
             st.session_state[f"w_{k}"] = v
+    matlijst.laad_keuze_uit_json("w", loaded.get("mat_json", ""))
+    if loaded.get("mat_modus") not in MAT_MODI:
+        st.session_state["w_mat_modus"] = MAT_MODI[1]   # oudere projecten: bedragen ongewijzigd
     st.success("Project geladen — pas aan waar nodig.")
 
 # ================= Klant =================
@@ -59,10 +65,28 @@ with c5:
     boiler = st.selectbox("Sanitair warmwaterboiler", [0, 200, 300], index=2,
                           format_func=lambda v: "Geen" if v == 0 else f"{v} L", key="w_boiler")
 
+# ================= Materiaal =================
+st.subheader("Materiaal")
+mat_modus = st.radio("Hoe wil je het installatiemateriaal berekenen?", MAT_MODI, key="w_mat_modus", horizontal=True,
+    help="Gedetailleerd: je duidt per artikel aan hoeveel je nodig hebt, met de prijzen uit **📦 Materialen & prijzen**. "
+         "Buffervat, boiler, sokkel, regeling en afvoer blijven via de keuzes hierboven/hieronder lopen. "
+         "Snel: forfaitaire bedragen voor hydraulica, elektriciteit en klein materiaal, zoals voorheen.")
+gedetailleerd = (mat_modus == MAT_MODI[0])
+gekozen_materiaal = None
+mat_weergave = "artikel"
+if gedetailleerd:
+    gekozen_materiaal = matlijst.materiaal_keuze_ui("w", "Warmtepomp", MATERIALEN, 1 + P["marge_materiaal_pct"] / 100.0)
+    MAT_WEERGAVE = {"Elk artikel apart": "artikel", "Per categorie": "categorie", "Eén totaalregel 'Installatiemateriaal'": "totaal"}
+    mat_weergave = MAT_WEERGAVE[st.selectbox("Materiaal op de PDF tonen als", list(MAT_WEERGAVE.keys()), key="w_mat_weergave")]
+
+st.subheader("Werk & opties")
 c6, c7, c8 = st.columns(3)
 with c6:
-    hydro = st.checkbox("Hydraulisch materiaal (leidingen, kranen, expansievat)", value=True, key="w_hydro")
-    elek = st.checkbox("Elektrische aansluiting + sturing", value=True, key="w_elek")
+    hydro = st.checkbox("Hydraulisch materiaal (leidingen, kranen, expansievat)" + (" — forfait" if not gedetailleerd else ""),
+                        value=True, key="w_hydro", disabled=gedetailleerd,
+                        help="In gedetailleerde modus komt het hydraulisch materiaal uit de materiaallijst." if gedetailleerd else None)
+    elek = st.checkbox("Elektrische aansluiting + sturing", value=True, key="w_elek",
+                       help="Telt mee in de urenschatting. In gedetailleerde modus komt het materiaal uit de materiaallijst." if gedetailleerd else None)
 with c7:
     sokkel = st.checkbox("Betonsokkel / grondconsole", value=True, key="w_sokkel")
     afvoer_oud = st.checkbox("Afbraak & afvoer oude ketel", key="w_afvoer")
@@ -99,7 +123,8 @@ inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp,
            afvoer_oud=afvoer_oud, regeling=regeling,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
            arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
-           korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
+           korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
+           materialen=gekozen_materiaal, mat_weergave=mat_weergave)
 res = bereken_wp(inp, P)
 
 st.subheader("Offerte-opbouw")
@@ -147,6 +172,7 @@ with b1:
 
 with b2:
     if st.button("💾 Project bewaren", use_container_width=True):
+        st.session_state["w_mat_json"] = matlijst.keuze_als_json("w")
         payload = {k.replace("w_", "", 1): v for k, v in st.session_state.items()
                    if k.startswith("w_") and "_btn" not in k
                    and isinstance(v, (str, int, float, bool))}

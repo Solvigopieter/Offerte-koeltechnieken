@@ -15,10 +15,13 @@ import math
 import pandas as pd
 
 from pr_core import DEFAULT_PRIJZEN, bereken_airco, bereken_airco_gemengd, maak_pdf, gen_offertenummer, eenheid_label
-from storage import load_prijzen, save_project
+from storage import load_prijzen, save_project, load_materialen
 import pr_catalogus as cat
+import materialen as matlijst
 
 P = load_prijzen(DEFAULT_PRIJZEN)
+MATERIALEN = load_materialen()
+MAT_MODI = ["📦 Gedetailleerd (materiaallijst)", "⚡ Snel (forfaitair)"]
 
 st.title("❄️ Airco Offerte")
 
@@ -39,6 +42,11 @@ if loaded and loaded.get("_type") == "airco":
             st.session_state.pop("a_units_editor", None)  # forceer her-initialisatie van de tabelwidget
         except Exception:
             pass
+    # Materiaalkeuze terugzetten. Oudere projecten (van vóór de materiaallijst) openen in 'Snel'-modus,
+    # zodat hun bedragen exact hetzelfde blijven.
+    matlijst.laad_keuze_uit_json("a", loaded.get("mat_json", ""))
+    if loaded.get("mat_modus") not in MAT_MODI:
+        st.session_state["a_mat_modus"] = MAT_MODI[1]
     st.success("Project geladen — pas aan waar nodig.")
 
 # ================= Klant =================
@@ -449,37 +457,59 @@ else:
     aantal_systemen = sum(b["aantal_systemen"] for b in blokken) if blokken else 0
     merk_model = " + ".join(b["naam"] for b in blokken) if blokken else ""
 
+# ================= Materiaal =================
+st.subheader("Materiaal")
+mat_modus = st.radio("Hoe wil je het materiaal berekenen?", MAT_MODI, key="a_mat_modus", horizontal=True,
+    help="Gedetailleerd: je duidt per artikel aan hoeveel je nodig hebt (leidinggoot, bochten, kabelgoot, kabel, …) "
+         "met de prijzen uit **📦 Materialen & prijzen**. Snel: forfaitaire bedragen zoals voorheen.")
+gedetailleerd = (mat_modus == MAT_MODI[0])
+
+gekozen_materiaal = None
+mat_weergave = "artikel"
+if gedetailleerd:
+    gekozen_materiaal = matlijst.materiaal_keuze_ui("a", "Airco", MATERIALEN, 1 + P["marge_materiaal_pct"] / 100.0)
+    MAT_WEERGAVE = {"Elk artikel apart": "artikel", "Per categorie": "categorie", "Eén totaalregel 'Installatiemateriaal'": "totaal"}
+    mat_weergave = MAT_WEERGAVE[st.selectbox("Materiaal op de PDF tonen als", list(MAT_WEERGAVE.keys()), key="a_mat_weergave",
+        help="Bepaalt enkel hoe het op de offerte voor de klant staat — de berekening blijft dezelfde.")]
+    leiding_m, leiding_type, goot_m, goot_bij_klein, koelmiddel_m, console = 0.0, "geisoleerd", 0.0, False, 0.0, False
+
 # ================= Gedeelde gegevens (gelden voor de volledige job) =================
-st.subheader("Gedeelde gegevens" if gemengd else "Leidingwerk")
-c5a, c5b = st.columns(2)
-with c5a:
-    leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
-    leiding_type_label = st.selectbox(
-        "Type koelleiding",
-        ["Geïsoleerd (bv. gasleiding)", "Niet-geïsoleerd (bv. vloeistofleiding)", "Combi"],
-        key="a_leiding_type_label",
-        help="Combi = 1 rol met een eigen prijs per meter (tussen geïsoleerd en niet-geïsoleerd "
-             "in — instelbaar bij Prijsinstellingen), voor als je in de praktijk 1 gezamenlijke "
-             "rol/product gebruikt in plaats van 2 aparte.")
-    leiding_type = {"Geïsoleerd (bv. gasleiding)": "geisoleerd", "Niet-geïsoleerd (bv. vloeistofleiding)": "niet_geisoleerd",
-                    "Combi": "combi"}[leiding_type_label]
-    _rol_m = P.get("a_leiding_rol_m", 30.0)
-    if leiding_m > 0:
-        _aantal_rollen = math.ceil(leiding_m / _rol_m)
-        st.caption(f"→ {leiding_m:g}m nodig ⇒ {_aantal_rollen} rol(len) van {_rol_m:g}m "
-                  f"= {_aantal_rollen * _rol_m:.0f}m aangerekend.")
-with c5b:
-    goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
-    goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
-        help="Handig als er maar een klein stukje kabelgoot nodig is — de kost wordt dan meegeteld in 'Klein materiaal & bevestiging' in plaats van als eigen regel op de offerte te verschijnen.")
+st.subheader("Gedeelde gegevens" if gemengd else ("Werk & uren" if gedetailleerd else "Leidingwerk"))
+c5a, c5b = st.columns(2) if not gedetailleerd else (None, None)
+if not gedetailleerd:
+    with c5a:
+        leiding_m = st.number_input("Totale leidinglengte, alle systemen samen (m)", min_value=0.0, value=5.0, step=0.5, key="a_leiding")
+        leiding_type_label = st.selectbox(
+            "Type koelleiding",
+            ["Geïsoleerd (bv. gasleiding)", "Niet-geïsoleerd (bv. vloeistofleiding)", "Combi"],
+            key="a_leiding_type_label",
+            help="Combi = 1 rol met een eigen prijs per meter (tussen geïsoleerd en niet-geïsoleerd "
+                 "in — instelbaar bij Prijsinstellingen), voor als je in de praktijk 1 gezamenlijke "
+                 "rol/product gebruikt in plaats van 2 aparte.")
+        leiding_type = {"Geïsoleerd (bv. gasleiding)": "geisoleerd", "Niet-geïsoleerd (bv. vloeistofleiding)": "niet_geisoleerd",
+                        "Combi": "combi"}[leiding_type_label]
+        _rol_m = P.get("a_leiding_rol_m", 30.0)
+        if leiding_m > 0:
+            _aantal_rollen = math.ceil(leiding_m / _rol_m)
+            st.caption(f"→ {leiding_m:g}m nodig ⇒ {_aantal_rollen} rol(len) van {_rol_m:g}m "
+                      f"= {_aantal_rollen * _rol_m:.0f}m aangerekend.")
+    with c5b:
+        goot_m = st.number_input("Sierlijst / leidinggoot, totaal (m)", min_value=0.0, value=3.0, step=0.5, key="a_goot")
+        goot_bij_klein = st.checkbox("Kabelgoot bij 'Klein materiaal' voegen (geen aparte regel)", key="a_goot_bij_klein",
+            help="Handig als er maar een klein stukje kabelgoot nodig is — de kost wordt dan meegeteld in 'Klein materiaal & bevestiging' in plaats van als eigen regel op de offerte te verschijnen.")
 
 c6, c7, c8 = st.columns(3)
 with c6:
-    doorvoeren = st.number_input("Muurdoorvoeren, totaal aantal", min_value=0, value=1, key="a_doorvoeren")
-    koelmiddel_m = st.number_input("Extra koelmiddel (m boven voorvulling)", min_value=0.0, value=0.0, step=1.0, key="a_koelmiddel")
+    doorvoeren = st.number_input("Muurdoorvoeren, totaal aantal", min_value=0, value=1, key="a_doorvoeren",
+        help="Telt mee in de urenschatting." if gedetailleerd else None)
+    if not gedetailleerd:
+        koelmiddel_m = st.number_input("Extra koelmiddel (m boven voorvulling)", min_value=0.0, value=0.0, step=1.0, key="a_koelmiddel")
 with c7:
-    condenspomp = st.checkbox("Condenspomp nodig (per binnenunit)", key="a_condenspomp")
-    console = st.checkbox("Muurconsole + trillingsdempers (per systeem)", value=True, key="a_console")
+    if gedetailleerd:
+        st.caption("Enkel voor de **urenschatting** — het materiaal zelf duid je hierboven aan.")
+    condenspomp = st.checkbox("Condenspomp plaatsen" if gedetailleerd else "Condenspomp nodig (per binnenunit)", key="a_condenspomp")
+    if not gedetailleerd:
+        console = st.checkbox("Muurconsole + trillingsdempers (per systeem)", value=True, key="a_console")
     elek = st.checkbox("Elektrische voeding trekken (per systeem)", value=True, key="a_elek")
     hoogtewerker = st.checkbox("Hoogtewerker / moeilijke toegang", key="a_hoogtewerker")
 with c8:
@@ -517,7 +547,8 @@ if not gemengd:
                console=console, elek=elek, hoogtewerker=hoogtewerker,
                techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
                arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
-               korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
+               korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
+               materialen=gekozen_materiaal, mat_weergave=mat_weergave)
     res = bereken_airco(inp, P)
 else:
     gedeeld = dict(leiding_m=leiding_m, leiding_type=leiding_type, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
@@ -525,7 +556,8 @@ else:
                    console=console, elek=elek, hoogtewerker=hoogtewerker,
                    techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
                    arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
-                   korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label)
+                   korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
+                   materialen=gekozen_materiaal, mat_weergave=mat_weergave)
     res = bereken_airco_gemengd(blokken, gedeeld, P)
     inp = gedeeld
 
@@ -581,6 +613,7 @@ with b1:
 
 with b2:
     if st.button("💾 Project bewaren", use_container_width=True):
+        st.session_state["a_mat_json"] = matlijst.keuze_als_json("a")
         if gemengd:
             st.session_state["a_blokken_json"] = json.dumps(st.session_state.get("a_blokken", []))
         if not gemengd and verschillende_toestellen:

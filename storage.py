@@ -139,6 +139,59 @@ def save_prijzen(prijzen: dict):
         _local_save(data)
 
 
+# ---------------------------------------------------------------- materialen
+@st.cache_data(ttl=300, show_spinner=False)
+def _load_materialen_ruw() -> list[dict] | None:
+    """Leest het tabblad 'Materialen'. None = tabblad bestaat nog niet / is leeg."""
+    if _use_gsheets():
+        sh = _sheet()
+        try:
+            ws = sh.worksheet("Materialen")
+        except Exception:
+            return None
+        rijen = ws.get_all_records()
+        return rijen or None
+    rijen = _local_load().get("materialen")
+    return rijen or None
+
+
+def load_materialen() -> list[dict]:
+    """Geeft de materiaallijst terug. Zolang er nog niets bewaard is, krijg je
+    de startlijst uit materialen.py."""
+    from materialen import DEFAULT_MATERIALEN, normaliseer
+    try:
+        rijen = _load_materialen_ruw()
+    except Exception as e:
+        st.warning(f"Kon materiaallijst niet laden uit Google Sheets: {e}")
+        rijen = None
+    if not rijen:
+        return [dict(m) for m in DEFAULT_MATERIALEN]
+    return normaliseer(rijen)
+
+
+def save_materialen(materialen: list[dict]):
+    from materialen import MAT_HEADERS, normaliseer
+    materialen = normaliseer(materialen)
+    if _use_gsheets():
+        ws = _ws("Materialen", MAT_HEADERS)
+        rows = [MAT_HEADERS]
+        for m in materialen:
+            rows.append([
+                m["id"], "ja" if m["actief"] else "nee", m["toepassing"], m["categorie"],
+                m["artikel"], m["eenheid"],
+                _naar_getal_tekst(float(m["verpakking"])),
+                _naar_getal_tekst(float(m["inkoop"])),
+                _naar_getal_tekst(float(m["verkoop"])),
+            ])
+        ws.clear()
+        ws.update(values=rows, range_name="A1", value_input_option="USER_ENTERED")
+    else:
+        data = _local_load()
+        data["materialen"] = materialen
+        _local_save(data)
+    _load_materialen_ruw.clear()
+
+
 # ---------------------------------------------------------------- projecten
 def save_project(ptype: str, klant: str, totaal_incl: float, payload: dict,
                   mat_inkoop: float = 0.0, netto_winst: float = 0.0) -> str:

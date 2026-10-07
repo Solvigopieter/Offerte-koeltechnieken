@@ -162,6 +162,40 @@ def _leiding_regel(leiding_m: float, leiding_type: str, P: dict):
     return omschrijving, aantal_tekst, inkoop_totaal, aangerekende_m
 
 
+def materiaal_regels(materialen: list, marge: float, weergave: str = "artikel") -> list:
+    """Zet de gekozen artikels uit de materiaallijst om naar offertelijnen
+    (omschrijving, aantal-tekst, inkoop-totaal, verkoop-totaal, eenheidsprijs-verkoop).
+
+    weergave:
+      "artikel"   -> elke lijn apart op de offerte
+      "categorie" -> 1 lijn per categorie (bv. 'Leidinggoot & toebehoren')
+      "totaal"    -> 1 lijn 'Installatiemateriaal'
+    """
+    from materialen import aangerekende_hoeveelheid
+
+    lijnen = []
+    for m in materialen or []:
+        hoeveelheid = aangerekende_hoeveelheid(float(m.get("aantal") or 0), float(m.get("verpakking") or 0))
+        if hoeveelheid <= 0:
+            continue
+        inkoop_eenheid = float(m.get("inkoop") or 0)
+        vk_eenheid = _vk(inkoop_eenheid, float(m.get("verkoop") or 0), marge)
+        lijnen.append((m.get("categorie") or "Overig", m.get("artikel") or "Materiaal",
+                       f"{hoeveelheid:g} {m.get('eenheid') or 'st'}",
+                       hoeveelheid * inkoop_eenheid, hoeveelheid * vk_eenheid, vk_eenheid))
+
+    if weergave == "totaal" and lijnen:
+        return [("Installatiemateriaal (leidingen, goten, bevestiging, klein materiaal)", "",
+                 sum(l[3] for l in lijnen), sum(l[4] for l in lijnen), sum(l[4] for l in lijnen))]
+    if weergave == "categorie":
+        per_cat = {}
+        for cat, _art, _aantal, ink, vk, _e in lijnen:
+            a, b = per_cat.get(cat, (0.0, 0.0))
+            per_cat[cat] = (a + ink, b + vk)
+        return [(f"{cat} & toebehoren", "", ink, vk, vk) for cat, (ink, vk) in per_cat.items()]
+    return [(art, aantal, ink, vk, e) for _cat, art, aantal, ink, vk, e in lijnen]
+
+
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
     n = inp["n_binnen"]                       # binnenunits per systeem
@@ -207,27 +241,32 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         eenheid = verkoop_totaal / aantal_num if aantal_num else verkoop_totaal
         mat.append((om, aantal, inkoop_totaal, verkoop_totaal, eenheid))
 
-    _lo, _la, _li, _lm = _leiding_regel(inp["leiding_m"], inp.get("leiding_type", "geisoleerd"), P)
-    std(_lo, _la, _li, aantal_num=_lm)
+    if inp.get("materialen") is not None:
+        # Gedetailleerd: materiaal komt uit de materiaallijst (aantallen per artikel)
+        mat.extend(materiaal_regels(inp["materialen"], marge, inp.get("mat_weergave", "artikel")))
+    else:
+        # Snel / forfaitair (zoals voorheen)
+        _lo, _la, _li, _lm = _leiding_regel(inp["leiding_m"], inp.get("leiding_type", "geisoleerd"), P)
+        std(_lo, _la, _li, aantal_num=_lm)
 
-    goot_inkoop = inp["goot_m"] * P["a_goot_pm"]
-    goot_bij_klein = inp.get("goot_bij_klein", False)
-    if inp["goot_m"] > 0 and not goot_bij_klein:
-        std("Sierlijst / leidinggoot", f"{inp['goot_m']} m", goot_inkoop, aantal_num=inp["goot_m"])
+        goot_inkoop = inp["goot_m"] * P["a_goot_pm"]
+        goot_bij_klein = inp.get("goot_bij_klein", False)
+        if inp["goot_m"] > 0 and not goot_bij_klein:
+            std("Sierlijst / leidinggoot", f"{inp['goot_m']} m", goot_inkoop, aantal_num=inp["goot_m"])
 
-    klein_inkoop = P["a_klein_basis"] * aantal_systemen + n_totaal * P["a_klein_per_unit"]
-    if inp["goot_m"] > 0 and goot_bij_klein:
-        klein_inkoop += goot_inkoop
-    std("Klein materiaal & bevestiging", "", klein_inkoop)
+        klein_inkoop = P["a_klein_basis"] * aantal_systemen + n_totaal * P["a_klein_per_unit"]
+        if inp["goot_m"] > 0 and goot_bij_klein:
+            klein_inkoop += goot_inkoop
+        std("Klein materiaal & bevestiging", "", klein_inkoop)
 
-    if inp["koelmiddel_m"] > 0:
-        std("Extra koelmiddel R32", f"{inp['koelmiddel_m']} m", inp["koelmiddel_m"] * P["a_koelmiddel_pm"], aantal_num=inp["koelmiddel_m"])
-    if inp["condenspomp"]:
-        std("Condenspomp", f"{n_totaal} st" if n_totaal > 1 else "1 st", P["a_condenspomp"] * n_totaal, aantal_num=n_totaal)
-    if inp["console"]:
-        std("Muurconsole + trillingsdempers", f"{aantal_systemen} st", P["a_console"] * aantal_systemen, aantal_num=aantal_systemen)
-    if inp["elek"]:
-        std("Elektrisch materiaal", f"{aantal_systemen} circuit(s)", P["a_elek_mat"] * aantal_systemen, aantal_num=aantal_systemen)
+        if inp["koelmiddel_m"] > 0:
+            std("Extra koelmiddel R32", f"{inp['koelmiddel_m']} m", inp["koelmiddel_m"] * P["a_koelmiddel_pm"], aantal_num=inp["koelmiddel_m"])
+        if inp["condenspomp"]:
+            std("Condenspomp", f"{n_totaal} st" if n_totaal > 1 else "1 st", P["a_condenspomp"] * n_totaal, aantal_num=n_totaal)
+        if inp["console"]:
+            std("Muurconsole + trillingsdempers", f"{aantal_systemen} st", P["a_console"] * aantal_systemen, aantal_num=aantal_systemen)
+        if inp["elek"]:
+            std("Elektrisch materiaal", f"{aantal_systemen} circuit(s)", P["a_elek_mat"] * aantal_systemen, aantal_num=aantal_systemen)
 
     mat_inkoop = sum(m[2] for m in mat)
     mat_verkoop = sum(m[3] for m in mat)
@@ -362,27 +401,30 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
         eenheid = verkoop_totaal / aantal_num if aantal_num else verkoop_totaal
         mat.append((om, aantal_txt, inkoop_totaal, verkoop_totaal, eenheid))
 
-    _lo, _la, _li, _lm = _leiding_regel(gedeeld["leiding_m"], gedeeld.get("leiding_type", "geisoleerd"), P)
-    std(_lo, _la, _li, aantal_num=_lm)
+    if gedeeld.get("materialen") is not None:
+        mat.extend(materiaal_regels(gedeeld["materialen"], marge, gedeeld.get("mat_weergave", "artikel")))
+    else:
+        _lo, _la, _li, _lm = _leiding_regel(gedeeld["leiding_m"], gedeeld.get("leiding_type", "geisoleerd"), P)
+        std(_lo, _la, _li, aantal_num=_lm)
 
-    goot_inkoop = gedeeld["goot_m"] * P["a_goot_pm"]
-    goot_bij_klein = gedeeld.get("goot_bij_klein", False)
-    if gedeeld["goot_m"] > 0 and not goot_bij_klein:
-        std("Sierlijst / leidinggoot", f"{gedeeld['goot_m']} m", goot_inkoop, aantal_num=gedeeld["goot_m"])
+        goot_inkoop = gedeeld["goot_m"] * P["a_goot_pm"]
+        goot_bij_klein = gedeeld.get("goot_bij_klein", False)
+        if gedeeld["goot_m"] > 0 and not goot_bij_klein:
+            std("Sierlijst / leidinggoot", f"{gedeeld['goot_m']} m", goot_inkoop, aantal_num=gedeeld["goot_m"])
 
-    klein_inkoop = P["a_klein_basis"] * aantal_systemen_totaal + n_totaal_totaal * P["a_klein_per_unit"]
-    if gedeeld["goot_m"] > 0 and goot_bij_klein:
-        klein_inkoop += goot_inkoop
-    std("Klein materiaal & bevestiging", "", klein_inkoop)
+        klein_inkoop = P["a_klein_basis"] * aantal_systemen_totaal + n_totaal_totaal * P["a_klein_per_unit"]
+        if gedeeld["goot_m"] > 0 and goot_bij_klein:
+            klein_inkoop += goot_inkoop
+        std("Klein materiaal & bevestiging", "", klein_inkoop)
 
-    if gedeeld.get("koelmiddel_m", 0) > 0:
-        std("Extra koelmiddel R32", f"{gedeeld['koelmiddel_m']} m", gedeeld["koelmiddel_m"] * P["a_koelmiddel_pm"], aantal_num=gedeeld["koelmiddel_m"])
-    if gedeeld.get("condenspomp"):
-        std("Condenspomp", f"{n_totaal_totaal} st" if n_totaal_totaal > 1 else "1 st", P["a_condenspomp"] * n_totaal_totaal, aantal_num=n_totaal_totaal)
-    if gedeeld.get("console"):
-        std("Muurconsole + trillingsdempers", f"{aantal_systemen_totaal} st", P["a_console"] * aantal_systemen_totaal, aantal_num=aantal_systemen_totaal)
-    if gedeeld.get("elek"):
-        std("Elektrisch materiaal", f"{aantal_systemen_totaal} circuit(s)", P["a_elek_mat"] * aantal_systemen_totaal, aantal_num=aantal_systemen_totaal)
+        if gedeeld.get("koelmiddel_m", 0) > 0:
+            std("Extra koelmiddel R32", f"{gedeeld['koelmiddel_m']} m", gedeeld["koelmiddel_m"] * P["a_koelmiddel_pm"], aantal_num=gedeeld["koelmiddel_m"])
+        if gedeeld.get("condenspomp"):
+            std("Condenspomp", f"{n_totaal_totaal} st" if n_totaal_totaal > 1 else "1 st", P["a_condenspomp"] * n_totaal_totaal, aantal_num=n_totaal_totaal)
+        if gedeeld.get("console"):
+            std("Muurconsole + trillingsdempers", f"{aantal_systemen_totaal} st", P["a_console"] * aantal_systemen_totaal, aantal_num=aantal_systemen_totaal)
+        if gedeeld.get("elek"):
+            std("Elektrisch materiaal", f"{aantal_systemen_totaal} circuit(s)", P["a_elek_mat"] * aantal_systemen_totaal, aantal_num=aantal_systemen_totaal)
 
     mat_inkoop = sum(m[2] for m in mat)
     mat_verkoop = sum(m[3] for m in mat)
@@ -428,6 +470,9 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
         "marge": marge,
         "aantal_systemen_totaal": aantal_systemen_totaal, "n_totaal_totaal": n_totaal_totaal,
     }
+
+
+def bereken_wp(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
 
     wp_inkoop = inp["prijs_wp"]
@@ -450,9 +495,10 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
         std("Sanitair warmwaterboiler 200 L", "1 st", P["w_boiler_200"])
     elif inp["boiler"] == 300:
         std("Sanitair warmwaterboiler 300 L", "1 st", P["w_boiler_300"])
-    if inp["hydro"]:
+    gedetailleerd = inp.get("materialen") is not None
+    if inp["hydro"] and not gedetailleerd:
         std("Hydraulisch materiaal (leidingen, kranen, expansievat)", "", P["w_hydro"])
-    if inp["elek"]:
+    if inp["elek"] and not gedetailleerd:
         std("Elektrisch materiaal & sturing", "", P["w_elek_mat"])
     if inp["sokkel"]:
         std("Sokkel / grondconsole buitenunit", "1 st", P["w_sokkel"])
@@ -460,7 +506,10 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
         std("Afbraak & afvoer oude installatie", "", P["w_afvoer_oud"])
     if inp["regeling"]:
         std("Slimme thermostaat / weersafhankelijke regeling", "1 st", P["w_regeling"])
-    std("Klein materiaal & verbruiksgoederen", "", P["w_klein"])
+    if gedetailleerd:
+        mat.extend(materiaal_regels(inp["materialen"], marge, inp.get("mat_weergave", "artikel")))
+    else:
+        std("Klein materiaal & verbruiksgoederen", "", P["w_klein"])
 
     mat_inkoop = sum(m[2] for m in mat)
     mat_verkoop = sum(m[3] for m in mat)

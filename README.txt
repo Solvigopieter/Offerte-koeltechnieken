@@ -18,7 +18,28 @@ Structuur
 - pages/02_Warmtepomp Offerte.py
 - pages/03_Projecten.py
 - pages/04_Prijsinstellingen.py
+- pages/05_Materialen.py          → 📦 vaste materiaallijst met prijzen beheren
+- materialen.py                   → startlijst materialen + materiaalkeuze op de offertepagina's
 - assets/logo.png                 → Solvigo Koeltechnieken-logo (staat er al in, komt in de PDF-header)
+
+Materiaallijst ("📦 Materialen & prijzen")
+-----------------------------------------
+Alle materiaal (koelleiding, leidinggoot + bochten/hoeken/T-stukken, elektrische
+kabelgoot, kabel, condensafvoer, bevestiging, koelmiddel, hydraulica, klein
+materiaal) staat in één lijst met inkoop- en verkoopprijs. De app bewaart die in
+de Google Sheet, tabblad "Materialen" (wordt automatisch aangemaakt bij de eerste
+keer bewaren). Op de offertepagina kies je "📦 Gedetailleerd (materiaallijst)"
+en vul je per artikel enkel nog het aantal in.
+
+- Verkoop = 0      → automatisch inkoop x marge% (Prijsinstellingen)
+- Verpakking = 30  → altijd per volle verpakking aanrekenen (bv. rol koper van 30 m)
+- Actief = nee     → verborgen op de offertes, niet verwijderd
+- Op de PDF kies je: elk artikel apart, per categorie, of één totaalregel.
+- "⚡ Snel (forfaitair)" werkt nog zoals vroeger; oudere bewaarde projecten openen
+  automatisch in die modus zodat hun bedragen niet veranderen.
+
+LET OP: de startprijzen in de lijst zijn schattingen — pas ze aan naar je eigen
+inkoopprijzen en klik op "Materiaallijst bewaren".
 
 "Verstuur naar CRM"-knop activeren
 -----------------------------------

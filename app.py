@@ -19,7 +19,9 @@ Gebruik de **sidebar** links:
 - ❄️ **Airco Offerte** — mono- en multi-split installaties
 - 🔥 **Warmtepomp Offerte** — lucht-water warmtepompen
 - 📁 **Projecten** — bewaarde offertes terug openen of verwijderen
-- ⚙️ **Prijsinstellingen** — alle tarieven en materiaalprijzen aanpassen (geen code nodig)
+- ⚙️ **Prijsinstellingen** — uurtarief, marges, kilometerprijs en forfaitaire bedragen
+- 📦 **Materialen & prijzen** — je vaste materiaallijst (leidinggoot, bochten, kabelgoot, kabel, …) met prijzen
 """)
 
-st.info("Prijzen aanpassen? Ga naar **Prijsinstellingen** — wijzigingen gelden meteen voor alle nieuwe offertes.")
+st.info("Materiaalprijzen aanpassen? Ga naar **📦 Materialen & prijzen** — de app onthoudt ze, "
+        "op de offerte vul je daarna enkel nog aantallen in.")
