@@ -235,7 +235,9 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         binnen_inkoop = inp["prijs_binnen"] * n_totaal
         binnen_verkoop = binnen_eenheid_verkoop * n_totaal
         mat.append((f"Buitenunit {inp['merk_model']}".strip(), f"{aantal_systemen} st", buiten_inkoop, buiten_verkoop, buiten_eenheid_verkoop))
-        mat.append((f"Binnenunit(s)", f"{n_totaal} st", binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
+        binnen_naam = (inp.get("merk_model_binnen") or "").strip()
+        mat.append((f"Binnenunit {binnen_naam}" if binnen_naam else "Binnenunit(s)", f"{n_totaal} st",
+                    binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
         toestel_verkoop += buiten_verkoop + binnen_verkoop
 
     def std(om, aantal, inkoop_totaal, aantal_num=1):
@@ -385,7 +387,9 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
             binnen_inkoop = blok.get("prijs_binnen", 0) * n_totaal_blok
             binnen_verkoop = binnen_eenheid * n_totaal_blok
             mat.append((f"Buitenunit {blok.get('merk_model', '')}{label}".strip(), f"{aantal} st", buiten_inkoop, buiten_verkoop, buiten_eenheid))
-            mat.append((f"Binnenunit(s){label}", f"{n_totaal_blok} st", binnen_inkoop, binnen_verkoop, binnen_eenheid))
+            binnen_naam = (blok.get("merk_model_binnen") or "").strip()
+            mat.append(((f"Binnenunit {binnen_naam}" if binnen_naam else "Binnenunit(s)") + label,
+                        f"{n_totaal_blok} st", binnen_inkoop, binnen_verkoop, binnen_eenheid))
             toestel_verkoop += buiten_verkoop + binnen_verkoop
 
         aantal_systemen_totaal += aantal

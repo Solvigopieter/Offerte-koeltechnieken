@@ -153,6 +153,7 @@ if not gemengd:
         is_mono = (n_binnen == 1)
 
         verschillende_toestellen = False
+        merk_binnen = ""
         if is_mono:
             verschillende_toestellen = st.checkbox("Toestellen hebben elk een andere grootte/prijs", key="a_verschillende_toestellen",
                 help="Aanvinken als je bv. 3 losse mono-split airco's plaatst die niet allemaal hetzelfde vermogen/merk/prijs hebben. "
@@ -189,6 +190,8 @@ if not gemengd:
             st.markdown("**Binnenunit**")
             prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=450.0, step=10.0, key="a_prijs_binnen")
             prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0 = auto marge%)", min_value=0.0, value=0.0, step=10.0, key="a_prijs_binnen_verkoop")
+            merk_binnen = st.text_input("Merk & model binnenunit (op offerte)", key="a_merk_binnen",
+                                        placeholder="bv. Panasonic Etherea CS-Z25ZKEW")
 
     # ---- Panasonic-catalogus: automatische prijsinvulling ----
     if not verschillende_toestellen:
@@ -224,6 +227,7 @@ if not gemengd:
                     it = st.session_state["_a_cat_binnen_item"]
                     st.session_state["a_prijs_binnen"] = _inkoop_schatting(it[3])
                     st.session_state["a_prijs_binnen_verkoop"] = float(it[3])
+                    st.session_state["a_merk_binnen"] = cat.binnen_naam(it)
 
                 st.button("↳ Vul binnenunit-prijs in", key="a_cat_binnen_btn", on_click=_vul_binnen)
             st.caption(f"Inkoopprijs = adviesprijs × {(100-korting_pct)/100:.2f} ({korting_pct:.0f}% dealerkorting — instelbaar bij Prijsinstellingen). "
@@ -342,6 +346,7 @@ else:
                         it = st.session_state["_a_blok_cat_binnen_item"]
                         st.session_state["a_blok_prijs_binnen"] = _inkoop_schatting(it[3])
                         st.session_state["a_blok_prijs_binnen_verkoop"] = float(it[3])
+                        st.session_state["a_blok_merk_binnen"] = cat.binnen_naam(it)
 
                     st.button("↳ Vul binnenunit-prijs in", key="a_blok_cat_binnen_btn", on_click=_vul_blok_binnen)
                 else:
@@ -407,8 +412,10 @@ else:
             if blok_n > 1 and not blok_verschillende_binnen:
                 blok_prijs_binnen = st.number_input("Inkoopprijs per binnenunit (EUR)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_binnen")
                 blok_prijs_binnen_verkoop = st.number_input("Verkoopprijs per binnenunit (EUR, 0=auto)", min_value=0.0, value=0.0, step=10.0, key="a_blok_prijs_binnen_verkoop")
+                blok_merk_binnen = st.text_input("Merk & model binnenunit (op offerte)", key="a_blok_merk_binnen")
             else:
                 blok_prijs_binnen, blok_prijs_binnen_verkoop = 0.0, 0.0
+                blok_merk_binnen = ""
 
         blok_merk = st.text_input("Merk & model (op offerte)", key="a_blok_merk")
 
@@ -428,6 +435,7 @@ else:
                     aantal_systemen=int(blok_aantal),
                     merk_model=blok_merk, prijs_buiten=float(blok_prijs_buiten), prijs_buiten_verkoop=float(blok_prijs_buiten_verkoop),
                     prijs_binnen=float(blok_prijs_binnen), prijs_binnen_verkoop=float(blok_prijs_binnen_verkoop),
+                    merk_model_binnen=(blok_merk_binnen if (blok_n > 1 and not blok_verschillende_binnen) else ""),
                 )
                 if blok_n > 1 and blok_verschillende_binnen:
                     nieuw_blok["custom_binnenunits"] = blok_custom_binnen
@@ -544,6 +552,7 @@ if not gemengd:
     inp = dict(n_binnen=n_binnen, aantal_systemen=aantal_systemen, mono_set=is_mono, custom_units=custom_units, merk_model=merk_model, prijs_buiten=prijs_buiten,
                prijs_buiten_verkoop=prijs_buiten_verkoop,
                prijs_binnen=prijs_binnen, prijs_binnen_verkoop=prijs_binnen_verkoop,
+               merk_model_binnen=(merk_binnen if (not is_mono and not verschillende_toestellen) else ""),
                leiding_m=leiding_m, leiding_type=leiding_type, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
                doorvoeren=doorvoeren, koelmiddel_m=koelmiddel_m, condenspomp=condenspomp,
                console=console, elek=elek, hoogtewerker=hoogtewerker,
