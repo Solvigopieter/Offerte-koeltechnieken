@@ -241,6 +241,17 @@ def _arbeid_uit_toestel(mat: list, n_toestel_rijen: int, arbeid: float) -> float
     return bedrag
 
 
+def _te_tonen_arbeid(d: dict, mat: list, n_toestel_rijen: int, uren_bedrag: float) -> float:
+    """Hoeveel arbeid er uit de toestelprijs gehaald wordt, volgens de gekozen manier:
+    'pct' = % van de toestelprijs, 'vast' = vast bedrag, anders uren x uurtarief."""
+    modus = d.get("arbeid_tonen_modus", "uren")
+    if modus == "pct":
+        return sum(m[3] for m in mat[:n_toestel_rijen]) * float(d.get("arbeid_tonen_pct", 20) or 0) / 100.0
+    if modus == "vast":
+        return float(d.get("arbeid_tonen_vast", 0) or 0)
+    return uren_bedrag
+
+
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
     n = inp["n_binnen"]                       # binnenunits per systeem
@@ -344,9 +355,11 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
     arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
     arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+    arbeid_gevraagd = 0.0
     if not arbeid_aanrekenen and inp.get("arbeid_tonen"):
         # Arbeid zat in de toestelprijs: toon ze apart, toestellen worden evenveel goedkoper (totaal gelijk)
-        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, uren * inp["techniekers"] * P["uurtarief"])
+        arbeid_gevraagd = _te_tonen_arbeid(inp, mat, n_toestel_rijen, uren * inp["techniekers"] * P["uurtarief"])
+        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, arbeid_gevraagd)
         arbeid_aanrekenen = arbeid > 0
         mat_verkoop = sum(m[3] for m in mat)
 
@@ -380,7 +393,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     return {
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
-        "arbeid_aanrekenen": arbeid_aanrekenen,
+        "arbeid_aanrekenen": arbeid_aanrekenen, "arbeid_gevraagd": arbeid_gevraagd,
         "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": extra,
         "subtotaal_voor_korting": subtotaal_voor_korting,
         "korting_bedrag": korting_bedrag, "korting_label": korting_label,
@@ -502,8 +515,10 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
     uren = gedeeld["uren_manueel"] if gedeeld.get("uren_manueel", 0) > 0 else uren_auto
     arbeid_aanrekenen = gedeeld.get("arbeid_aanrekenen", True)
     arbeid = (uren * gedeeld["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+    arbeid_gevraagd = 0.0
     if not arbeid_aanrekenen and gedeeld.get("arbeid_tonen"):
-        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, uren * gedeeld["techniekers"] * P["uurtarief"])
+        arbeid_gevraagd = _te_tonen_arbeid(gedeeld, mat, n_toestel_rijen, uren * gedeeld["techniekers"] * P["uurtarief"])
+        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, arbeid_gevraagd)
         arbeid_aanrekenen = arbeid > 0
         mat_verkoop = sum(m[3] for m in mat)
 
@@ -535,7 +550,7 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
     return {
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
-        "arbeid_aanrekenen": arbeid_aanrekenen,
+        "arbeid_aanrekenen": arbeid_aanrekenen, "arbeid_gevraagd": arbeid_gevraagd,
         "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": extra,
         "subtotaal_voor_korting": subtotaal_voor_korting,
         "korting_bedrag": korting_bedrag, "korting_label": korting_label,
@@ -603,9 +618,11 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
     arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
     arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+    arbeid_gevraagd = 0.0
     if not arbeid_aanrekenen and inp.get("arbeid_tonen"):
         # Arbeid zat in de toestelprijs: toon ze apart, toestellen worden evenveel goedkoper (totaal gelijk)
-        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, uren * inp["techniekers"] * P["uurtarief"])
+        arbeid_gevraagd = _te_tonen_arbeid(inp, mat, n_toestel_rijen, uren * inp["techniekers"] * P["uurtarief"])
+        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, arbeid_gevraagd)
         arbeid_aanrekenen = arbeid > 0
         mat_verkoop = sum(m[3] for m in mat)
     km_kost = inp["km"] * P["km_prijs"] * 2
@@ -635,7 +652,7 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     return {
         "mat": mat, "mat_inkoop": mat_inkoop, "mat_verkoop": mat_verkoop,
         "uren": uren, "uren_auto": uren_auto, "arbeid": arbeid,
-        "arbeid_aanrekenen": arbeid_aanrekenen,
+        "arbeid_aanrekenen": arbeid_aanrekenen, "arbeid_gevraagd": arbeid_gevraagd,
         "km_kost": km_kost, "vast": vast, "dossier_aanrekenen": dossier_aanrekenen, "extra_hoogte": 0.0,
         "subtotaal_voor_korting": subtotaal_voor_korting,
         "korting_bedrag": korting_bedrag, "korting_label": korting_label,

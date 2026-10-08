@@ -100,8 +100,19 @@ with c8:
         arbeid_tonen = st.checkbox("Arbeid toch apart tonen op de offerte", key="w_arbeid_tonen",
             help="De werkuren worden uit de toestelprijs gehaald en als aparte regel getoond. "
                  "De warmtepomp lijkt zo goedkoper, de totaalprijs en je marge blijven exact gelijk.")
+    arbeid_tonen_modus, arbeid_tonen_pct, arbeid_tonen_vast = "uren", 20.0, 0.0
+    if arbeid_tonen:
+        _modi = {"% van de toestelprijs": "pct", "Vast bedrag": "vast", "Uren × uurtarief": "uren"}
+        arbeid_tonen_modus = _modi[st.selectbox("Installatieregel berekenen als", list(_modi.keys()), key="w_arbeid_tonen_modus")]
+        if arbeid_tonen_modus == "pct":
+            arbeid_tonen_pct = st.number_input("% van de toestelprijs naar installatie", min_value=0.0, max_value=60.0, value=20.0,
+                                               step=1.0, key="w_arbeid_tonen_pct")
+        elif arbeid_tonen_modus == "vast":
+            arbeid_tonen_vast = st.number_input("Bedrag installatie (EUR excl. BTW)", min_value=0.0, value=550.0,
+                                                step=10.0, key="w_arbeid_tonen_vast")
     uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="w_uren",
-                                   disabled=not (arbeid_aanrekenen or arbeid_tonen))
+                                   disabled=not (arbeid_aanrekenen or (arbeid_tonen and arbeid_tonen_modus == "uren")),
+                                   help="Bij % of vast bedrag tellen de uren enkel nog mee voor je marge-berekening (loonkost).")
     dossier_aanrekenen = st.checkbox("Dossier-/opstartkost aanrekenen", value=True, key="w_dossier_aanrekenen",
         help="Uitvinken om de vaste dossier-/opstartkost weg te laten van deze offerte.")
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="w_km")
@@ -130,7 +141,7 @@ inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp,
            buffer=buffer, boiler=boiler, hydro=hydro, elek=elek, sokkel=sokkel,
            afvoer_oud=afvoer_oud, regeling=regeling,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
-           arbeid_aanrekenen=arbeid_aanrekenen, arbeid_tonen=arbeid_tonen, dossier_aanrekenen=dossier_aanrekenen,
+           arbeid_aanrekenen=arbeid_aanrekenen, arbeid_tonen=arbeid_tonen, arbeid_tonen_modus=arbeid_tonen_modus, arbeid_tonen_pct=arbeid_tonen_pct, arbeid_tonen_vast=arbeid_tonen_vast, dossier_aanrekenen=dossier_aanrekenen,
            korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
            materialen=gekozen_materiaal, mat_weergave=mat_weergave,
            voorschot_pct=(P.get("voorschot_pct", 40.0) if voorschot_vragen else 0.0))
@@ -143,8 +154,14 @@ def _eh(bedrag, unit=""):
 
 rows = [{"Omschrijving": m[0].replace("\n", " — "), "Aantal": m[1], "Eenheidsprijs": _eh(m[4], eenheid_label(m[1])), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
 if res["arbeid_aanrekenen"]:
-    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto")
-                 + (" — uit toestelprijs gehaald" if arbeid_tonen else ""), "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
+    if arbeid_tonen and arbeid_tonen_modus == "pct":
+        _arb_label = f"Installatie — {arbeid_tonen_pct:g}% uit toestelprijs"
+    elif arbeid_tonen and arbeid_tonen_modus == "vast":
+        _arb_label = "Installatie — vast bedrag uit toestelprijs"
+    else:
+        _arb_label = (f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto")
+                      + (" — uit toestelprijs gehaald" if arbeid_tonen else ""))
+    rows.append({"Omschrijving": _arb_label, "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
 else:
     rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": 0.0})
 rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
@@ -154,10 +171,10 @@ if res.get("korting_bedrag", 0) > 0:
     rows.append({"Omschrijving": f"Korting — {res['korting_label']}", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": -round(res["korting_bedrag"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 if arbeid_tonen:
-    _vol = res["uren"] * techniekers * P["uurtarief"]
+    _vol = res.get("arbeid_gevraagd", 0.0)
     if res["arbeid"] + 0.01 < _vol:
-        st.warning(f"Arbeid aan uurtarief zou € {_vol:,.2f} zijn, maar er kan maar € {res['arbeid']:,.2f} uit de toestelprijs "
-                   "gehaald worden zonder onder je inkoopprijs te zakken. Verlaag de uren of verhoog de toestelprijs.".replace(",", " "))
+        st.warning(f"Gevraagd: € {_vol:,.2f} installatie, maar er kan maar € {res['arbeid']:,.2f} uit de toestelprijs "
+                   "gehaald worden zonder onder je inkoopprijs te zakken. Kies een lager % of bedrag.".replace(",", " "))
     else:
         st.caption(f"€ {res['arbeid']:,.2f} arbeid uit de toestelprijs gehaald — totaal en marge blijven gelijk.".replace(",", " "))
 
