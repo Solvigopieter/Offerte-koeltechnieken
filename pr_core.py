@@ -164,6 +164,20 @@ def _leiding_regel(leiding_m: float, leiding_type: str, P: dict):
     return omschrijving, aantal_tekst, inkoop_totaal, aangerekende_m
 
 
+# Hoe elke materiaalcategorie in de korte opsomming onder "Installatiemateriaal" verschijnt
+CATEGORIE_OMSCHRIJVING = {
+    "Koelleiding": "koelleidingen",
+    "Leidinggoot": "leidinggoot met hulpstukken",
+    "Elektrische kabelgoot": "kabelgoot",
+    "Elektriciteit": "elektrische aansluiting",
+    "Condensafvoer": "condensafvoer",
+    "Bevestiging": "bevestiging buitenunit",
+    "Koelmiddel": "extra koelmiddel",
+    "Hydraulica": "hydraulische aansluiting",
+    "Klein materiaal": "klein materiaal",
+}
+
+
 def materiaal_regels(materialen: list, marge: float, weergave: str = "artikel") -> list:
     """Zet de gekozen artikels uit de materiaallijst om naar offertelijnen
     (omschrijving, aantal-tekst, inkoop-totaal, verkoop-totaal, eenheidsprijs-verkoop).
@@ -187,7 +201,14 @@ def materiaal_regels(materialen: list, marge: float, weergave: str = "artikel") 
                        hoeveelheid * inkoop_eenheid, hoeveelheid * vk_eenheid, vk_eenheid))
 
     if weergave == "totaal" and lijnen:
-        return [("Installatiemateriaal", "",
+        # Korte versie: 1 regel, met eronder (na de \n) een opsomming van wat erin zit
+        cats = []
+        for l in lijnen:
+            naam = CATEGORIE_OMSCHRIJVING.get(l[0], l[0].lower())
+            if naam not in cats:
+                cats.append(naam)
+        detail = ", ".join(cats[:-1]) + (" en " if len(cats) > 1 else "") + cats[-1]
+        return [(f"Installatiemateriaal\nIncl. {detail}", "",
                  sum(l[3] for l in lijnen), sum(l[4] for l in lijnen), sum(l[4] for l in lijnen))]
     if weergave == "categorie":
         per_cat = {}
@@ -882,9 +903,11 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     idx = 0
     def row(om, aantal, bedrag):
         nonlocal idx
+        om, _, detail = str(om).partition("\n")
+        hoogte = 6.5 + (4.0 if detail else 0)
         if idx % 2 == 1:
             pdf.set_fill_color(*GREY)
-            pdf.rect(12, pdf.get_y(), 186, 6.5, "F")
+            pdf.rect(12, pdf.get_y(), 186, hoogte, "F")
         # Lange omschrijving: eerst kleiner lettertype proberen, pas als laatste redmiddel inkorten
         tekst = S(om)
         grootte = 9.5
@@ -898,6 +921,18 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         pdf.cell(35, 6.5, S(aantal), align="C")
         pdf.cell(41, 6.5, f"{bedrag:,.2f}".replace(",", " "), align="R")
         pdf.ln(6.5)
+        if detail:
+            # tweede, kleine grijze regel (bv. wat er in 'Installatiemateriaal' zit)
+            pdf.set_x(12)
+            pdf.set_font(F, "", 7.5)
+            pdf.set_text_color(130, 130, 130)
+            d = S(detail)
+            while pdf.get_string_width(d) > 182 and len(d) > 4:   # mag over de volle breedte (bedrag staat erboven)
+                d = d[:-4].rstrip() + "..."
+            pdf.cell(186, 3.5, d)
+            pdf.ln(4.0)
+            pdf.set_font(F, "", 9.5)
+            pdf.set_text_color(50, 50, 50)
         pdf.set_x(12)
         pdf.line(12, pdf.get_y(), 198, pdf.get_y())
         idx += 1

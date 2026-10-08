@@ -684,7 +684,7 @@ def _eh(bedrag, unit=""):
     txt = f"€ {bedrag:,.2f}".replace(",", " ")
     return f"{txt} {unit}".strip() if unit else txt
 
-rows = [{"Omschrijving": m[0], "Aantal": m[1], "Eenheidsprijs": _eh(m[4], eenheid_label(m[1])), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
+rows = [{"Omschrijving": m[0].replace("\n", " — "), "Aantal": m[1], "Eenheidsprijs": _eh(m[4], eenheid_label(m[1])), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
 if res["arbeid_aanrekenen"]:
     rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto")
                  + (" — uit toestelprijs gehaald" if arbeid_tonen else ""), "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
