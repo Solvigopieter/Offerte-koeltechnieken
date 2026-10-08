@@ -19,6 +19,7 @@ DEFAULT_PRIJZEN = {
     "km_prijs": 0.75,             # EUR per km (enkel)
     "vast_dossier": 75.0,         # vast opstart-/dossierbedrag per offerte
     "minimum_tarief": 350.0,      # minimum offertebedrag excl. BTW
+    "voorschot_pct": 40.0,        # voorschot bij goedkeuring offerte (% van totaal incl. BTW)
 
     # Airco
     "a_leiding_geisoleerd_pm": 5.9,      # koperleiding geïsoleerd, per meter (inkoop)
@@ -69,6 +70,7 @@ PRIJS_LABELS = {
     "km_prijs": "Kilometerprijs (EUR/km, enkel)",
     "vast_dossier": "Vast dossier-/opstartbedrag (EUR)",
     "minimum_tarief": "Minimumtarief offerte excl. BTW (EUR)",
+    "voorschot_pct": "Voorschot bij goedkeuring (% van totaal incl. BTW)",
     "a_leiding_geisoleerd_pm": "Airco: koperleiding geïsoleerd per meter (EUR, inkoop)",
     "a_leiding_niet_geisoleerd_pm": "Airco: koperleiding niet-geïsoleerd per meter (EUR, inkoop)",
     "a_leiding_combi_pm": "Airco: koperleiding combi per meter (EUR, inkoop) — tussen geïsoleerd en niet-geïsoleerd in",
@@ -604,19 +606,22 @@ BEDRIJFSINFO = [
 # ---------------------------------------------------------------- ALGEMENE VOORWAARDEN
 # Pas gerust aan — dit is een degelijke basis voor een Belgische HVAC-installateur,
 # maar laat ze idealiter nog eens nalezen door je boekhouder of een jurist vóór
-# je ze structureel gebruikt. LET OP: art. 11 (bevoegde rechtbank) invullen!
+# je ze structureel gebruikt. Termen: "consument" = particulier (B2C), "zakelijke klant" = bedrijf (B2B).
 ALGEMENE_VOORWAARDEN = [
-    ("Art. 1 — Toepassing",
+    ("Art. 1 — Identificatie en toepassing",
      "Deze algemene voorwaarden zijn van toepassing op alle offertes, overeenkomsten, leveringen en werken van "
-     "Solvigo Koeltechnieken (hierna 'de installateur'). Afwijkingen zijn enkel geldig indien schriftelijk overeengekomen. "
-     "De voorwaarden van de klant zijn niet tegenstelbaar aan de installateur, tenzij uitdrukkelijk schriftelijk aanvaard."),
+     "Solvigo Koeltechnieken, een afdeling van Solvigo BV, Baksveld 38, 2260 Westerlo, ondernemingsnummer "
+     "BE 0677.778.392 (hierna 'de installateur'). Door ondertekening of schriftelijke aanvaarding (ook per e-mail) "
+     "van de offerte, of bij aanvang van de werken, aanvaardt de klant deze voorwaarden. Afwijkingen zijn enkel geldig "
+     "indien schriftelijk overeengekomen. Algemene voorwaarden van de klant zijn niet van toepassing."),
 
     ("Art. 2 — Offertes en prijzen",
      "Offertes zijn geldig tot de vermelde vervaldatum en zijn opgemaakt op basis van de door de klant verstrekte "
-     "informatie. Alle prijzen zijn exclusief BTW tenzij anders vermeld. De installateur behoudt zich het recht voor "
-     "prijzen aan te passen indien de kostprijs van materialen tussen offerte en uitvoering aantoonbaar stijgt met "
-     "meer dan 5%, en dit beperkt tot het gedeelte van de prijs dat betrekking heeft op die materialen. Kennelijke "
-     "vergissingen of schrijffouten in de offerte binden de installateur niet."),
+     "informatie. Alle prijzen zijn exclusief BTW tenzij anders vermeld. Kennelijke vergissingen of schrijffouten "
+     "binden de installateur niet. Indien de aankoopprijs van toestellen of materialen tussen offerte en uitvoering "
+     "aantoonbaar met meer dan 5% stijgt, mag de installateur de prijs van die materialen evenredig aanpassen. "
+     "Een consument kan in dat geval de overeenkomst kosteloos schriftelijk ontbinden binnen 7 kalenderdagen na "
+     "kennisgeving van de prijsaanpassing; een reeds betaald voorschot wordt dan volledig terugbetaald."),
 
     ("Art. 3 — BTW-tarief",
      "Bij toepassing van het verlaagd BTW-tarief van 6% verklaart de klant dat de woning ouder is dan 10 jaar, "
@@ -624,54 +629,79 @@ ALGEMENE_VOORWAARDEN = [
      "eindgebruiker. De klant is als enige aansprakelijk voor de juistheid van deze verklaring en vrijwaart de "
      "installateur voor elke naheffing, boete of interest die uit een onjuiste verklaring voortvloeit."),
 
-    ("Art. 4 — Uitvoering en toegang tot de werf",
-     "Uitvoeringstermijnen zijn indicatief en binden de installateur niet, behoudens uitdrukkelijk anders "
-     "overeengekomen. Vertraging geeft geen recht op schadevergoeding of ontbinding. De klant zorgt voor vrije en "
-     "veilige toegang tot de werf, een werkende elektrische aansluiting en de nodige nutsvoorzieningen. Wachttijden "
-     "of nutteloze verplaatsingen te wijten aan de klant kunnen in regie worden aangerekend."),
+    ("Art. 4 — Voorschot en betaling",
+     "Tenzij anders vermeld op de offerte is bij goedkeuring een voorschot verschuldigd zoals vermeld op de offerte; "
+     "het saldo wordt gefactureerd na oplevering. Toestellen en materialen worden pas besteld en de uitvoering wordt "
+     "pas ingepland na ontvangst van het voorschot. Facturen zijn betaalbaar binnen 14 kalenderdagen na factuurdatum. "
+     "Consumenten: bij laattijdige betaling volgt eerst een kosteloze herinnering met een termijn van 14 kalenderdagen; "
+     "pas daarna zijn de wettelijke verwijlintresten en de wettelijk toegelaten forfaitaire schadevergoeding verschuldigd "
+     "(Boek XIX WER). Zakelijke klanten: bij laattijdige betaling is van rechtswege en zonder ingebrekestelling een "
+     "verwijlintrest verschuldigd conform de wet van 2 augustus 2002, evenals een forfaitaire schadevergoeding van 10% "
+     "van het factuurbedrag met een minimum van 125 EUR."),
 
-    ("Art. 5 — Meerwerken en onvoorziene omstandigheden",
+    ("Art. 5 — Herroepingsrecht (consumenten)",
+     "Wordt de overeenkomst met een consument op afstand (bv. per e-mail) of buiten de verkoopruimte (bv. bij de klant "
+     "thuis) gesloten, dan heeft de consument het recht om binnen 14 kalenderdagen na het sluiten van de overeenkomst "
+     "zonder opgave van redenen af te zien van de overeenkomst, door een ondubbelzinnige verklaring per e-mail of brief "
+     "aan de installateur. Een reeds betaald voorschot wordt dan binnen 14 dagen terugbetaald. Wenst de consument dat de "
+     "werken binnen deze termijn starten, dan vraagt hij dit uitdrukkelijk (bv. per e-mail); bij herroeping na aanvang "
+     "is hij een bedrag verschuldigd in verhouding tot wat reeds werd geleverd en uitgevoerd. Het herroepingsrecht "
+     "vervalt zodra de werken met zijn uitdrukkelijke toestemming volledig zijn uitgevoerd."),
+
+    ("Art. 6 — Uitvoering en toegang tot de werf",
+     "Uitvoeringstermijnen zijn indicatief, behoudens uitdrukkelijk anders overeengekomen. De klant zorgt voor vrije en "
+     "veilige toegang tot de werf, een werkende elektrische aansluiting en de nodige nutsvoorzieningen, die kosteloos "
+     "ter beschikking worden gesteld. Wachttijden of nutteloze verplaatsingen te wijten aan de klant kunnen in regie "
+     "worden aangerekend."),
+
+    ("Art. 7 — Meerwerken en onvoorziene omstandigheden",
      "Werken die niet in de offerte zijn opgenomen (o.a. asbestverwijdering, ontoegankelijke leidingtraces, extra "
-     "doorboringen, aanpassingen aan de elektrische installatie, grondwerken) zijn meerwerken. Meerwerken worden "
-     "slechts uitgevoerd na overleg met de klant en worden aangerekend in regie of volgens afzonderlijke prijsopgave."),
+     "doorboringen, aanpassingen aan de elektrische installatie, grondwerken) zijn meerwerken. Meerwerken worden vooraf "
+     "met de klant besproken, kunnen schriftelijk of elektronisch (e-mail, berichtendienst) worden overeengekomen en "
+     "worden aangerekend in regie of volgens afzonderlijke prijsopgave."),
 
-    ("Art. 6 — Betaling",
-     "Behoudens andersluidende vermelding zijn facturen betaalbaar binnen 14 kalenderdagen na factuurdatum. De "
-     "installateur kan een voorschot vragen vóór bestelling van de toestellen. Bij niet-betaling op de vervaldag is "
-     "van rechtswege en zonder ingebrekestelling een verwijlintrest verschuldigd conform de wet van 2 augustus 2002 "
-     "betreffende de bestrijding van de betalingsachterstand, evenals een forfaitaire schadevergoeding van 10% van "
-     "het factuurbedrag met een minimum van 125 EUR. Bij consumenten gelden de wettelijke regels inzake eerste "
-     "kosteloze herinnering en maximale vergoedingen (Boek XIX WER)."),
-
-    ("Art. 7 — Eigendomsvoorbehoud",
+    ("Art. 8 — Eigendomsvoorbehoud",
      "Geleverde toestellen en materialen blijven eigendom van de installateur tot volledige betaling van de "
      "hoofdsom, kosten en interesten. Het risico gaat evenwel over op de klant vanaf de levering op de werf."),
 
-    ("Art. 8 — Garantie",
+    ("Art. 9 — Garantie",
      "Op toestellen geldt de fabrieksgarantie volgens de voorwaarden van de fabrikant. Voor consumenten geldt "
-     "daarnaast de wettelijke garantie van 2 jaar op consumptiegoederen. Op de uitgevoerde installatiewerken "
-     "verleent de installateur een waarborg van 2 jaar op verborgen gebreken in de uitvoering. De garantie vervalt "
-     "bij foutief gebruik, gebrekkig onderhoud, ingrepen door derden, bevriezing, over- of onderspanning op het "
-     "elektriciteitsnet of externe oorzaken. Periodiek onderhoud volgens de voorschriften van de fabrikant is een "
-     "voorwaarde voor het behoud van de garantie."),
+     "daarnaast de wettelijke garantie van 2 jaar voor elk gebrek aan overeenstemming dat zich binnen 2 jaar na "
+     "levering manifesteert. Op de uitgevoerde installatiewerken verleent de installateur een waarborg van 2 jaar. "
+     "De garantie vervalt bij normale slijtage, foutief gebruik, gebrekkig onderhoud, ingrepen door derden, bevriezing, "
+     "over- of onderspanning op het elektriciteitsnet of externe oorzaken zoals blikseminslag of stormschade. "
+     "Periodiek onderhoud volgens de voorschriften van de fabrikant is een voorwaarde voor het behoud van de garantie."),
 
-    ("Art. 9 — Aansprakelijkheid",
+    ("Art. 10 — Aansprakelijkheid",
      "De aansprakelijkheid van de installateur is beperkt tot de directe schade die het rechtstreeks gevolg is van "
      "een bewezen fout in de uitvoering, en tot maximaal het bedrag van de betreffende overeenkomst. De installateur "
-     "is niet aansprakelijk voor indirecte schade zoals gebruiksderving, productieverlies of gevolgschade, behoudens "
-     "in geval van opzet of zware fout. Deze beperkingen doen geen afbreuk aan de wettelijke rechten van consumenten."),
+     "is niet aansprakelijk voor indirecte schade zoals gebruiksderving, productieverlies, gemiste besparingen of "
+     "gevolgschade, behoudens in geval van opzet of zware fout. Deze beperkingen gelden niet voor schade door "
+     "overlijden of lichamelijk letsel en doen geen afbreuk aan de dwingende wettelijke rechten van consumenten."),
 
-    ("Art. 10 — Annulering en klachten",
-     "Bij annulering van de overeenkomst door de klant vóór aanvang van de werken is een forfaitaire vergoeding "
-     "verschuldigd van 15% van het offertebedrag, verhoogd met de kosten van reeds bestelde of geleverde materialen "
-     "die niet kosteloos geretourneerd kunnen worden. Zichtbare gebreken dienen op straffe van verval gemeld te "
-     "worden binnen 8 kalenderdagen na oplevering; verborgen gebreken binnen 2 maanden na ontdekking, telkens per "
-     "aangetekend schrijven of e-mail met ontvangstbevestiging."),
+    ("Art. 11 — Overmacht",
+     "De installateur is niet aansprakelijk voor vertraging of niet-uitvoering ten gevolge van overmacht, zoals "
+     "extreme weersomstandigheden, stakingen, overheidsmaatregelen, transport- of leveringsvertragingen van "
+     "toestellen en materialen bij fabrikanten of groothandels, of algemene schaarste. De verplichtingen worden "
+     "opgeschort zolang de overmacht duurt. Duurt de overmacht langer dan 3 maanden, dan kunnen beide partijen de "
+     "overeenkomst kosteloos ontbinden; een voorschot wordt dan terugbetaald na aftrek van wat reeds werd geleverd."),
 
-    ("Art. 11 — Toepasselijk recht en bevoegde rechtbank",
-     "Op alle overeenkomsten is uitsluitend het Belgisch recht van toepassing. Geschillen behoren tot de uitsluitende "
-     "bevoegdheid van de rechtbanken van het gerechtelijk arrondissement van de maatschappelijke zetel van de "
-     "installateur, onverminderd dwingende bevoegdheidsregels ten aanzien van consumenten."),
+    ("Art. 12 — Annulering",
+     "Bij annulering van de overeenkomst door de klant vóór aanvang van de werken (buiten het herroepingsrecht van "
+     "art. 5) is een forfaitaire vergoeding verschuldigd van 15% van het offertebedrag, verhoogd met de kostprijs van "
+     "reeds specifiek voor de klant bestelde materialen die niet kosteloos geretourneerd kunnen worden. Annuleert de "
+     "installateur de overeenkomst ten onrechte (buiten overmacht), dan heeft een consument recht op een gelijkwaardige "
+     "vergoeding van 15% van het offertebedrag, onverminderd zijn recht op vergoeding van bewezen hogere schade."),
+
+    ("Art. 13 — Klachten",
+     "Zichtbare gebreken dienen gemeld te worden binnen 8 kalenderdagen na oplevering; verborgen gebreken binnen "
+     "2 maanden na ontdekking, telkens schriftelijk of per e-mail. Dit doet geen afbreuk aan de wettelijke garantie "
+     "van consumenten."),
+
+    ("Art. 14 — Toepasselijk recht en bevoegde rechtbank",
+     "Op alle overeenkomsten is uitsluitend het Belgisch recht van toepassing. Geschillen met zakelijke klanten "
+     "behoren tot de uitsluitende bevoegdheid van de rechtbanken van het gerechtelijk arrondissement Antwerpen, "
+     "afdeling Turnhout. Voor consumenten gelden de wettelijke bevoegdheidsregels."),
 ]
 
 
@@ -741,14 +771,14 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         f"BTW-tarief: {int(inp['btw']*100)}%",
     ]
     for i, d in enumerate(details):
-        pdf.set_xy(12, y0 + i * 4.6)
-        pdf.cell(90, 4.6, S(d))
+        pdf.set_xy(12, y0 + i * 4.3)
+        pdf.cell(90, 4.3, S(d))
     for i, lijn in enumerate(BEDRIJFSINFO):
-        pdf.set_xy(130, y0 + i * 4.6)
-        pdf.cell(0, 4.6, S(lijn))
+        pdf.set_xy(130, y0 + i * 4.3)
+        pdf.cell(0, 4.3, S(lijn))
 
     # --- Klant ---
-    pdf.set_y(y0 + max(len(details), len(BEDRIJFSINFO)) * 4.6 + 7)
+    pdf.set_y(y0 + max(len(details), len(BEDRIJFSINFO)) * 4.3 + 6)
     pdf.set_font(F, "B", 9)
     pdf.set_text_color(*NAVY)
     pdf.cell(0, 6, "KLANT", ln=1)
@@ -769,7 +799,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.set_font(F, "", 9)
     pdf.set_text_color(90, 90, 90)
     pdf.multi_cell(0, 5, S(intro))
-    pdf.ln(5)
+    pdf.ln(3)
 
     # --- Kostentabel: rustige lijnenstijl (geen volledig grid, geen felle vlakken) ---
     pdf.set_font(F, "B", 9)
@@ -798,7 +828,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
         nonlocal idx
         if idx % 2 == 1:
             pdf.set_fill_color(*GREY)
-            pdf.rect(12, pdf.get_y(), 186, 7, "F")
+            pdf.rect(12, pdf.get_y(), 186, 6.5, "F")
         # Lange omschrijving: eerst kleiner lettertype proberen, pas als laatste redmiddel inkorten
         tekst = S(om)
         grootte = 9.5
@@ -807,11 +837,11 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
             pdf.set_font(F, "", grootte)
         while pdf.get_string_width(tekst) > 107 and len(tekst) > 4:
             tekst = tekst[:-4].rstrip() + "..."
-        pdf.cell(110, 7, tekst)
+        pdf.cell(110, 6.5, tekst)
         pdf.set_font(F, "", 9.5)
-        pdf.cell(35, 7, S(aantal), align="C")
-        pdf.cell(41, 7, f"{bedrag:,.2f}".replace(",", " "), align="R")
-        pdf.ln(7)
+        pdf.cell(35, 6.5, S(aantal), align="C")
+        pdf.cell(41, 6.5, f"{bedrag:,.2f}".replace(",", " "), align="R")
+        pdf.ln(6.5)
         pdf.set_x(12)
         pdf.line(12, pdf.get_y(), 198, pdf.get_y())
         idx += 1
@@ -835,8 +865,8 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     def tot_row(label, bedrag, bold=False, groot=False):
         pdf.set_font(F, "B" if bold else "", 12 if groot else 9.5)
         pdf.set_text_color(*NAVY if bold else (90, 90, 90))
-        pdf.cell(145, 7 if not groot else 9, S(label), align="R")
-        pdf.cell(41, 7 if not groot else 9, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
+        pdf.cell(145, 6 if not groot else 8, S(label), align="R")
+        pdf.cell(41, 6 if not groot else 8, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
 
     if res.get("korting_bedrag", 0) > 0:
         tot_row("Subtotaal", res["subtotaal_voor_korting"])
@@ -849,18 +879,39 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     pdf.ln(2.5)
     tot_row("Totaal incl. BTW", res["totaal"], bold=True, groot=True)
 
+    # --- Betalingsvoorwaarden (voorschot) ---
+    voorschot_pct = float(inp.get("voorschot_pct", 0) or 0)
+    if 0 < voorschot_pct < 100:
+        voorschot = res["totaal"] * voorschot_pct / 100.0
+        saldo = res["totaal"] - voorschot
+        pdf.ln(3)
+        pdf.set_font(F, "B", 8.5)
+        pdf.set_text_color(*NAVY)
+        pdf.cell(0, 5, "BETALINGSVOORWAARDEN", ln=1)
+        pdf.set_font(F, "", 9)
+        pdf.set_text_color(50, 50, 50)
+        for label, bedrag in ((f"Voorschot {voorschot_pct:g}% bij goedkeuring van de offerte", voorschot),
+                              (f"Saldo {100 - voorschot_pct:g}% na oplevering", saldo)):
+            pdf.cell(145, 5, S(label))
+            pdf.cell(41, 5, f"EUR {bedrag:,.2f}".replace(",", " "), align="R", ln=1)
+        pdf.set_font(F, "", 7.5)
+        pdf.set_text_color(140, 140, 140)
+        pdf.multi_cell(0, 4, S(
+            "Toestellen worden besteld en de uitvoering ingepland na ontvangst van het voorschot. "
+            "Facturen zijn betaalbaar binnen 14 kalenderdagen na factuurdatum."))
+
     # --- Verwijzing naar algemene voorwaarden ---
-    pdf.ln(5)
-    pdf.set_font(F, "", 8)
+    pdf.ln(3)
+    pdf.set_font(F, "", 7.5)
     pdf.set_text_color(140, 140, 140)
-    pdf.multi_cell(0, 4.5, S(
+    pdf.multi_cell(0, 4, S(
         "Op deze offerte zijn onze algemene voorwaarden van toepassing (zie volgende pagina). "
         "Door ondertekening of schriftelijke aanvaarding van deze offerte verklaart de klant "
         "hiervan kennis te hebben genomen en deze te aanvaarden."))
 
     # --- Handtekeningvakken ---
     # Controleer eerst of dit blok nog past op de huidige pagina.
-    BENODIGDE_RUIMTE_HANDTEKENING = 40  # mm, met ruime marge
+    BENODIGDE_RUIMTE_HANDTEKENING = 19  # mm: 8 witruimte + lijn + 2 + 5 + 4 (2 regels tekst)
     PAGINA_HOOGTE_A4 = 297
     ONDERMARGE = 18
     if pdf.get_y() + BENODIGDE_RUIMTE_HANDTEKENING > (PAGINA_HOOGTE_A4 - ONDERMARGE):
@@ -873,7 +924,7 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     # op de nieuwe pagina en breekt elke cel na elkaar apart af (3 losse
     # bijna-blanco pagina's). Met ln=1 / set_x (niet set_xy) volgt de cursor
     # gewoon natuurlijk, ook als er onverhoopt toch een break zou gebeuren.
-    pdf.ln(9)
+    pdf.ln(8)
     pdf.set_draw_color(224, 226, 231)
     pdf.set_line_width(0.3)
     y_lijn = pdf.get_y()
@@ -911,17 +962,17 @@ def maak_pdf(titel: str, klant: dict, res: dict, inp: dict, intro: str) -> bytes
     # Cursor expliciet terug naar de linkermarge zetten (x én y) — de cellen
     # hierboven gebruiken een vaste breedte, maar dit is de vangnet-fix zodat
     # de tekst hierna altijd over de volledige paginabreedte kan starten.
-    pdf.set_xy(12, 32)
+    pdf.set_xy(12, 29)
     for titel_art, tekst_art in ALGEMENE_VOORWAARDEN:
         pdf.set_x(12)
-        pdf.set_font(F, "B", 8.5)
+        pdf.set_font(F, "B", 8)
         pdf.set_text_color(*NAVY)
-        pdf.multi_cell(0, 4.2, S(titel_art))
+        pdf.multi_cell(0, 3.9, S(titel_art))
         pdf.set_x(12)
-        pdf.set_font(F, "", 7.8)
+        pdf.set_font(F, "", 7.3)
         pdf.set_text_color(60, 60, 60)
-        pdf.multi_cell(0, 3.9, S(tekst_art))
-        pdf.ln(1.5)
+        pdf.multi_cell(0, 3.4, S(tekst_art))
+        pdf.ln(0.9)
         pdf.set_x(12)
 
     out = pdf.output(dest="S")

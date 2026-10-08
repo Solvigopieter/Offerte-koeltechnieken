@@ -521,6 +521,8 @@ with c8:
         help="Uitvinken om de vaste dossier-/opstartkost weg te laten van deze offerte.")
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="a_km")
     btw = st.selectbox("BTW-tarief", [0.21, 0.06], format_func=lambda v: f"{int(v*100)}%" + (" — renovatie >10 jaar" if v == 0.06 else " — nieuwbouw / <10 jaar"), key="a_btw")
+    voorschot_vragen = st.checkbox(f"Voorschot vragen ({P.get('voorschot_pct', 40):g}% bij goedkeuring)", value=True, key="a_voorschot",
+        help="Komt als betalingsvoorwaarde op de PDF. Percentage aanpasbaar bij Prijsinstellingen. Uitvinken voor kleine jobs.")
 
 # ================= Korting =================
 with st.expander("💶 Korting geven (bv. familie- of volumekorting)"):
@@ -548,7 +550,8 @@ if not gemengd:
                techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
                arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
                korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
-               materialen=gekozen_materiaal, mat_weergave=mat_weergave)
+               materialen=gekozen_materiaal, mat_weergave=mat_weergave,
+               voorschot_pct=(P.get("voorschot_pct", 40.0) if voorschot_vragen else 0.0))
     res = bereken_airco(inp, P)
 else:
     gedeeld = dict(leiding_m=leiding_m, leiding_type=leiding_type, goot_m=goot_m, goot_bij_klein=goot_bij_klein,
@@ -557,7 +560,8 @@ else:
                    techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
                    arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
                    korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
-                   materialen=gekozen_materiaal, mat_weergave=mat_weergave)
+                   materialen=gekozen_materiaal, mat_weergave=mat_weergave,
+               voorschot_pct=(P.get("voorschot_pct", 40.0) if voorschot_vragen else 0.0))
     res = bereken_airco_gemengd(blokken, gedeeld, P)
     inp = gedeeld
 
@@ -585,6 +589,9 @@ m1.metric("Subtotaal excl. BTW", f"€ {res['subtotaal']:,.2f}".replace(",", " "
 m2.metric(f"BTW {int(btw*100)}%", f"€ {res['btw_bedrag']:,.2f}".replace(",", " "))
 m3.metric("Totaal incl. BTW", f"€ {res['totaal']:,.2f}".replace(",", " "))
 m4.metric("Geschatte brutomarge", f"€ {res['winst']:,.2f}".replace(",", " "))
+if inp.get("voorschot_pct", 0) > 0:
+    _vs = res["totaal"] * inp["voorschot_pct"] / 100
+    st.caption(f"Voorschot {inp['voorschot_pct']:g}%: € {_vs:,.2f} · saldo na oplevering: € {res['totaal'] - _vs:,.2f}".replace(",", " "))
 
 # ================= Export & bewaren =================
 st.divider()
