@@ -199,8 +199,10 @@ def reset_keuze(prefix: str):
     (na het laden van een project)."""
     for k in list(st.session_state.keys()):
         if k.startswith(f"_{prefix}_matbase_") or k.startswith(f"{prefix}_mated_") \
-                or k in (f"_{prefix}_extra_base", f"{prefix}_matextra_ed"):
+                or k == f"_{prefix}_extra_base" or k.startswith(f"{prefix}_matextra_ed"):
             st.session_state.pop(k, None)
+    # nieuwe tabel-keys, zodat de browser geen oude wijzigingen opnieuw toepast
+    st.session_state[f"_{prefix}_matver"] = st.session_state.get(f"_{prefix}_matver", 0) + 1
 
 
 def laad_keuze_uit_json(prefix: str, tekst: str):
@@ -235,8 +237,10 @@ def materiaal_keuze_ui(prefix: str, toepassing: str, materialen: list[dict], mar
     for ci, (cat, tab) in enumerate(zip(cats, tabs)):
         items = [m for m in lijst if m["categorie"] == cat]
         handtekening = tuple((m["id"], m["artikel"], m["eenheid"], m["inkoop"], m["verkoop"], m["verpakking"]) for m in items)
+        ver = st.session_state.get(f"_{prefix}_matver", 0)          # verhoogt bij project laden / wissen
+        tabver = st.session_state.get(f"_{prefix}_matver_{ci}", 0)  # verhoogt als deze tab herbouwd wordt
         base_key = f"_{prefix}_matbase_{ci}"
-        ed_key = f"{prefix}_mated_{ci}"
+        ed_key = f"{prefix}_mated_{ci}_{ver}_{tabver}"
         if st.session_state.get(base_key, {}).get("sig") != handtekening:
             st.session_state[base_key] = {
                 "sig": handtekening,
@@ -249,6 +253,8 @@ def materiaal_keuze_ui(prefix: str, toepassing: str, materialen: list[dict], mar
                 } for m in items]),
             }
             st.session_state.pop(ed_key, None)
+            st.session_state[f"_{prefix}_matver_{ci}"] = tabver + 1
+            ed_key = f"{prefix}_mated_{ci}_{ver}_{tabver + 1}"
         with tab:
             edited = st.data_editor(
                 st.session_state[base_key]["df"], key=ed_key, hide_index=True, use_container_width=True,
@@ -282,7 +288,7 @@ def materiaal_keuze_ui(prefix: str, toepassing: str, materialen: list[dict], mar
             rijen = st.session_state.get(f"{prefix}_mat_extra", [])
             st.session_state[extra_base] = pd.DataFrame(rijen, columns=_EXTRA_KOLOMMEN) if rijen else _leeg_extra_df()
         extra_df = st.data_editor(
-            st.session_state[extra_base], key=f"{prefix}_matextra_ed", num_rows="dynamic",
+            st.session_state[extra_base], key=f"{prefix}_matextra_ed_{st.session_state.get(f'_{prefix}_matver', 0)}", num_rows="dynamic",
             hide_index=True, use_container_width=True,
             column_config={
                 "Aantal": st.column_config.NumberColumn(min_value=0.0, step=0.5, format="%g"),

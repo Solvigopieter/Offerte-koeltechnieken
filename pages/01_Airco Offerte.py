@@ -20,6 +20,19 @@ import pr_catalogus as cat
 import materialen as matlijst
 
 P = load_prijzen(DEFAULT_PRIJZEN)
+
+
+def _tabel_key(naam: str) -> str:
+    """Tabel-key met versienummer. Als de app de inhoud van een tabel zelf aanpast
+    (catalogus, project laden), krijgt de tabel een nieuwe key. Anders legt de browser
+    oude handmatige wijzigingen opnieuw over de nieuwe waarden."""
+    return f"{naam}_{st.session_state.get('_ver_' + naam, 0)}"
+
+
+def _vernieuw_tabel(naam: str):
+    st.session_state.pop(_tabel_key(naam), None)
+    st.session_state["_ver_" + naam] = st.session_state.get("_ver_" + naam, 0) + 1
+
 MATERIALEN = load_materialen()
 MAT_MODI = ["📦 Gedetailleerd (materiaallijst)", "⚡ Snel (forfaitair)"]
 
@@ -39,7 +52,7 @@ if loaded and loaded.get("_type") == "airco":
     if "a_units_json" in st.session_state:
         try:
             st.session_state["a_units_df"] = pd.DataFrame(json.loads(st.session_state["a_units_json"]))
-            st.session_state.pop("a_units_editor", None)  # forceer her-initialisatie van de tabelwidget
+            _vernieuw_tabel("a_units_editor")  # forceer her-initialisatie van de tabelwidget
         except Exception:
             pass
     if "a_binnen_json" in st.session_state:
@@ -49,7 +62,7 @@ if loaded and loaded.get("_type") == "airco":
             st.session_state.pop("a_binnen_df", None)
     else:
         st.session_state.pop("a_binnen_df", None)   # ouder project: tabel opbouwen uit prijs per binnenunit
-    st.session_state.pop("a_binnen_editor", None)
+    _vernieuw_tabel("a_binnen_editor")
     st.session_state.pop("_a_binnen_laatst", None)
     # Materiaalkeuze terugzetten. Oudere projecten (van vóór de materiaallijst) openen in 'Snel'-modus,
     # zodat hun bedragen exact hetzelfde blijven.
@@ -268,7 +281,7 @@ if not gemengd:
                         df.at[r, "Inkoopprijs (EUR)"] = _inkoop_schatting(it[3])
                         df.at[r, "Verkoopprijs (EUR, 0=auto)"] = float(it[3])
                     st.session_state["a_binnen_df"] = df
-                    st.session_state.pop("a_binnen_editor", None)
+                    _vernieuw_tabel("a_binnen_editor")
 
                 st.button("↳ Vul binnenunit in", key="a_cat_binnen_btn", on_click=_vul_binnen)
             st.caption(f"Inkoopprijs = adviesprijs × {(100-korting_pct)/100:.2f} ({korting_pct:.0f}% dealerkorting — instelbaar bij Prijsinstellingen). "
@@ -286,7 +299,7 @@ if not gemengd:
             df["Inkoopprijs (EUR)"] = float(st.session_state.get("a_prijs_binnen", 0.0) or 0.0)
             df["Verkoopprijs (EUR, 0=auto)"] = float(st.session_state.get("a_prijs_binnen_verkoop", 0.0) or 0.0)
             st.session_state["a_binnen_df"] = df
-            st.session_state.pop("a_binnen_editor", None)
+            _vernieuw_tabel("a_binnen_editor")
         elif len(df) != n_binnen:
             df = st.session_state.get("_a_binnen_laatst", df)
             df = df.reindex(range(n_binnen)).reset_index(drop=True)
@@ -295,9 +308,9 @@ if not gemengd:
             for k in ("Inkoopprijs (EUR)", "Verkoopprijs (EUR, 0=auto)"):
                 df[k] = df[k].fillna(0.0)
             st.session_state["a_binnen_df"] = df
-            st.session_state.pop("a_binnen_editor", None)
+            _vernieuw_tabel("a_binnen_editor")
         binnen_edit = st.data_editor(
-            st.session_state["a_binnen_df"], key="a_binnen_editor", hide_index=True, use_container_width=True,
+            st.session_state["a_binnen_df"], key=_tabel_key("a_binnen_editor"), hide_index=True, use_container_width=True,
             column_order=BINNEN_KOLOMMEN,
             column_config={
                 "Ruimte": st.column_config.TextColumn(help="bv. Living, Slaapkamer 1 — komt op de offerte"),
@@ -335,7 +348,7 @@ if not gemengd:
                     st.session_state["a_units_df"] = nieuwe_rijen
                 else:
                     st.session_state["a_units_df"] = pd.concat([bestaand, nieuwe_rijen], ignore_index=True)
-                st.session_state.pop("a_units_editor", None)
+                _vernieuw_tabel("a_units_editor")
 
             st.button("↳ Toevoegen aan tabel", key="a_cat_add_btn", on_click=_voeg_toe)
 
@@ -347,7 +360,7 @@ if not gemengd:
         })
         edited = st.data_editor(
             st.session_state.get("a_units_df", default_rows),
-            num_rows="dynamic", use_container_width=True, key="a_units_editor",
+            num_rows="dynamic", use_container_width=True, key=_tabel_key("a_units_editor"),
             column_config={
                 "Inkoopprijs (EUR)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
                 "Verkoopprijs (EUR, 0=auto)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
@@ -449,7 +462,7 @@ else:
                             st.session_state["a_blok_binnen_df"] = nieuwe_rij
                         else:
                             st.session_state["a_blok_binnen_df"] = pd.concat([bestaand, nieuwe_rij], ignore_index=True)
-                        st.session_state.pop("a_blok_binnen_editor", None)
+                        _vernieuw_tabel("a_blok_binnen_editor")
 
                     st.button("↳ Toevoegen aan tabel hieronder", key="a_blok_cat_binnen_multi_btn",
                              on_click=_voeg_blok_binnen_toe)
@@ -465,7 +478,7 @@ else:
             })
             blok_binnen_edited = st.data_editor(
                 st.session_state.get("a_blok_binnen_df", binnen_default),
-                num_rows="dynamic", use_container_width=True, key="a_blok_binnen_editor",
+                num_rows="dynamic", use_container_width=True, key=_tabel_key("a_blok_binnen_editor"),
                 column_config={
                     "Inkoopprijs (EUR)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
                     "Verkoopprijs (EUR, 0=auto)": st.column_config.NumberColumn(min_value=0.0, step=10.0, format="%.2f"),
