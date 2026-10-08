@@ -198,6 +198,28 @@ def materiaal_regels(materialen: list, marge: float, weergave: str = "artikel") 
     return [(art, aantal, ink, vk, e) for _cat, art, aantal, ink, vk, e in lijnen]
 
 
+def _ruimte_label(u: dict) -> str:
+    r = str(u.get("ruimte") or "").strip()
+    return f" — {r}" if r else ""
+
+
+def _arbeid_uit_toestel(mat: list, n_toestel_rijen: int, arbeid: float) -> float:
+    """Toont arbeid als aparte regel terwijl de totaalprijs gelijk blijft: het
+    arbeidsbedrag wordt evenredig van de verkoopprijs van de toestellen afgehaald.
+    Nooit lager dan de inkoopprijs van de toestellen. Geeft het effectief
+    verschoven bedrag terug."""
+    rijen = mat[:n_toestel_rijen]
+    vk = sum(r[3] for r in rijen)
+    ink = sum(r[2] for r in rijen)
+    bedrag = max(0.0, min(arbeid, vk - ink))
+    if bedrag <= 0 or vk <= 0:
+        return 0.0
+    f = (vk - bedrag) / vk
+    for i, (om, aantal, i_tot, v_tot, eenh) in enumerate(rijen):
+        mat[i] = (om, aantal, i_tot, v_tot * f, eenh * f)
+    return bedrag
+
+
 def bereken_airco(inp: dict, P: dict) -> dict:
     marge = 1 + P["marge_materiaal_pct"] / 100.0
     n = inp["n_binnen"]                       # binnenunits per systeem
@@ -218,7 +240,7 @@ def bereken_airco(inp: dict, P: dict) -> dict:
             u_inkoop = float(u.get("inkoop") or 0)
             u_verkoop = _vk(u_inkoop, float(u.get("verkoop") or 0), marge)
             naam = (u.get("merk_model") or "Toestel").strip() or "Toestel"
-            mat.append((f"Toestel (binnen- + buitenunit) {naam}", "1 st", u_inkoop, u_verkoop, u_verkoop))
+            mat.append((f"Toestel (binnen- + buitenunit) {naam}{_ruimte_label(u)}", "1 st", u_inkoop, u_verkoop, u_verkoop))
             toestel_verkoop += u_verkoop
     elif inp.get("mono_set") and n == 1:
         # Mono-split: 1 aankoopprijs voor het volledige toestel (binnen+buiten samen)
@@ -231,14 +253,27 @@ def bereken_airco(inp: dict, P: dict) -> dict:
         buiten_eenheid_verkoop = _vk(inp["prijs_buiten"], inp.get("prijs_buiten_verkoop", 0), marge)
         buiten_inkoop = inp["prijs_buiten"] * aantal_systemen
         buiten_verkoop = buiten_eenheid_verkoop * aantal_systemen
-        binnen_eenheid_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge)
-        binnen_inkoop = inp["prijs_binnen"] * n_totaal
-        binnen_verkoop = binnen_eenheid_verkoop * n_totaal
         mat.append((f"Buitenunit {inp['merk_model']}".strip(), f"{aantal_systemen} st", buiten_inkoop, buiten_verkoop, buiten_eenheid_verkoop))
-        binnen_naam = (inp.get("merk_model_binnen") or "").strip()
-        mat.append((f"Binnenunit {binnen_naam}" if binnen_naam else "Binnenunit(s)", f"{n_totaal} st",
-                    binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
-        toestel_verkoop += buiten_verkoop + binnen_verkoop
+        toestel_verkoop += buiten_verkoop
+        binnenunits = inp.get("binnenunits") or []
+        if binnenunits:
+            # Elke binnenunit apart, met eigen model, prijs en ruimte
+            for bu in binnenunits:
+                bu_ink = float(bu.get("inkoop") or 0)
+                bu_vk = _vk(bu_ink, float(bu.get("verkoop") or 0), marge)
+                bu_naam = (bu.get("merk_model") or "").strip()
+                mat.append(((f"Binnenunit {bu_naam}" if bu_naam else "Binnenunit") + _ruimte_label(bu),
+                            f"{aantal_systemen} st", bu_ink * aantal_systemen, bu_vk * aantal_systemen, bu_vk))
+                toestel_verkoop += bu_vk * aantal_systemen
+        else:
+            binnen_eenheid_verkoop = _vk(inp["prijs_binnen"], inp.get("prijs_binnen_verkoop", 0), marge)
+            binnen_inkoop = inp["prijs_binnen"] * n_totaal
+            binnen_verkoop = binnen_eenheid_verkoop * n_totaal
+            binnen_naam = (inp.get("merk_model_binnen") or "").strip()
+            mat.append((f"Binnenunit {binnen_naam}" if binnen_naam else "Binnenunit(s)", f"{n_totaal} st",
+                        binnen_inkoop, binnen_verkoop, binnen_eenheid_verkoop))
+            toestel_verkoop += binnen_verkoop
+    n_toestel_rijen = len(mat)
 
     def std(om, aantal, inkoop_totaal, aantal_num=1):
         verkoop_totaal = inkoop_totaal * marge
@@ -288,6 +323,11 @@ def bereken_airco(inp: dict, P: dict) -> dict:
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
     arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
     arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+    if not arbeid_aanrekenen and inp.get("arbeid_tonen"):
+        # Arbeid zat in de toestelprijs: toon ze apart, toestellen worden evenveel goedkoper (totaal gelijk)
+        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, uren * inp["techniekers"] * P["uurtarief"])
+        arbeid_aanrekenen = arbeid > 0
+        mat_verkoop = sum(m[3] for m in mat)
 
     km_kost = inp["km"] * P["km_prijs"] * 2
     extra = P["a_hoogtewerker"] if inp["hoogtewerker"] else 0.0
@@ -375,7 +415,7 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
                 bu_naam = (bu.get("merk_model") or "Binnenunit").strip() or "Binnenunit"
                 bu_inkoop_tot = bu_inkoop_stuk * aantal
                 bu_verkoop_tot = bu_verkoop_stuk * aantal
-                mat.append((f"Binnenunit {bu_naam}{label}", f"{aantal} st", bu_inkoop_tot, bu_verkoop_tot, bu_verkoop_stuk))
+                mat.append((f"Binnenunit {bu_naam}{_ruimte_label(bu) or label}", f"{aantal} st", bu_inkoop_tot, bu_verkoop_tot, bu_verkoop_stuk))
                 toestel_verkoop += bu_verkoop_tot
                 n_totaal_blok += aantal
         else:
@@ -401,6 +441,8 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
             + (P["a_uren_pomp"] if gedeeld.get("condenspomp") else 0)
         )
         uren_totaal += uren_per_systeem * aantal
+
+    n_toestel_rijen = len(mat)
 
     def std(om, aantal_txt, inkoop_totaal, aantal_num=1):
         verkoop_totaal = inkoop_totaal * marge
@@ -439,6 +481,10 @@ def bereken_airco_gemengd(blokken: list, gedeeld: dict, P: dict) -> dict:
     uren = gedeeld["uren_manueel"] if gedeeld.get("uren_manueel", 0) > 0 else uren_auto
     arbeid_aanrekenen = gedeeld.get("arbeid_aanrekenen", True)
     arbeid = (uren * gedeeld["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+    if not arbeid_aanrekenen and gedeeld.get("arbeid_tonen"):
+        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, uren * gedeeld["techniekers"] * P["uurtarief"])
+        arbeid_aanrekenen = arbeid > 0
+        mat_verkoop = sum(m[3] for m in mat)
 
     km_kost = gedeeld["km"] * P["km_prijs"] * 2
     extra = P["a_hoogtewerker"] if gedeeld.get("hoogtewerker") else 0.0
@@ -485,6 +531,7 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     wp_verkoop = _vk(wp_inkoop, inp.get("prijs_wp_verkoop", 0), marge)
 
     mat = [(f"Warmtepomp {inp['kw']} kW {inp['type']} {inp['merk_model']}".strip(), "1 st", wp_inkoop, wp_verkoop, wp_verkoop)]
+    n_toestel_rijen = 1
 
     def std(om, aantal, inkoop, aantal_num=1):
         verkoop_totaal = inkoop * marge
@@ -535,6 +582,11 @@ def bereken_wp(inp: dict, P: dict) -> dict:
     uren = inp["uren_manueel"] if inp["uren_manueel"] > 0 else uren_auto
     arbeid_aanrekenen = inp.get("arbeid_aanrekenen", True)
     arbeid = (uren * inp["techniekers"] * P["uurtarief"]) if arbeid_aanrekenen else 0.0
+    if not arbeid_aanrekenen and inp.get("arbeid_tonen"):
+        # Arbeid zat in de toestelprijs: toon ze apart, toestellen worden evenveel goedkoper (totaal gelijk)
+        arbeid = _arbeid_uit_toestel(mat, n_toestel_rijen, uren * inp["techniekers"] * P["uurtarief"])
+        arbeid_aanrekenen = arbeid > 0
+        mat_verkoop = sum(m[3] for m in mat)
     km_kost = inp["km"] * P["km_prijs"] * 2
     dossier_aanrekenen = inp.get("dossier_aanrekenen", True)
     vast = P["vast_dossier"] if dossier_aanrekenen else 0.0

@@ -95,7 +95,13 @@ with c8:
     techniekers = st.number_input("Aantal techniekers", min_value=1, value=2, key="w_techniekers")
     arbeid_aanrekenen = st.checkbox("Arbeid apart aanrekenen", value=True, key="w_arbeid_aanrekenen",
         help="Uitvinken als de installatie al inbegrepen zit in de toestelprijs (bv. bij sommige Panasonic-marges).")
-    uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="w_uren", disabled=not arbeid_aanrekenen)
+    arbeid_tonen = False
+    if not arbeid_aanrekenen:
+        arbeid_tonen = st.checkbox("Arbeid toch apart tonen op de offerte", key="w_arbeid_tonen",
+            help="De werkuren worden uit de toestelprijs gehaald en als aparte regel getoond. "
+                 "De warmtepomp lijkt zo goedkoper, de totaalprijs en je marge blijven exact gelijk.")
+    uren_manueel = st.number_input("Uren per technieker (0 = automatisch)", min_value=0.0, value=0.0, step=0.5, key="w_uren",
+                                   disabled=not (arbeid_aanrekenen or arbeid_tonen))
     dossier_aanrekenen = st.checkbox("Dossier-/opstartkost aanrekenen", value=True, key="w_dossier_aanrekenen",
         help="Uitvinken om de vaste dossier-/opstartkost weg te laten van deze offerte.")
     km = st.number_input("Afstand klant (km, enkel)", min_value=0.0, value=20.0, step=1.0, key="w_km")
@@ -124,7 +130,7 @@ inp = dict(type=wtype, kw=kw, merk_model=merk_model, prijs_wp=prijs_wp,
            buffer=buffer, boiler=boiler, hydro=hydro, elek=elek, sokkel=sokkel,
            afvoer_oud=afvoer_oud, regeling=regeling,
            techniekers=techniekers, uren_manueel=uren_manueel, km=km, btw=btw,
-           arbeid_aanrekenen=arbeid_aanrekenen, dossier_aanrekenen=dossier_aanrekenen,
+           arbeid_aanrekenen=arbeid_aanrekenen, arbeid_tonen=arbeid_tonen, dossier_aanrekenen=dossier_aanrekenen,
            korting_type=korting_type, korting_waarde=korting_waarde, korting_label=korting_label,
            materialen=gekozen_materiaal, mat_weergave=mat_weergave,
            voorschot_pct=(P.get("voorschot_pct", 40.0) if voorschot_vragen else 0.0))
@@ -136,8 +142,9 @@ def _eh(bedrag, unit=""):
     return f"{txt} {unit}".strip() if unit else txt
 
 rows = [{"Omschrijving": m[0], "Aantal": m[1], "Eenheidsprijs": _eh(m[4], eenheid_label(m[1])), "Verkoop totaal (EUR)": round(m[3], 2)} for m in res["mat"]]
-if arbeid_aanrekenen:
-    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto"), "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
+if res["arbeid_aanrekenen"]:
+    rows.append({"Omschrijving": f"Arbeid ({res['uren']:.1f} u × {techniekers} technieker(s))" + ("" if uren_manueel > 0 else " — auto")
+                 + (" — uit toestelprijs gehaald" if arbeid_tonen else ""), "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["arbeid"], 2)})
 else:
     rows.append({"Omschrijving": "Arbeid — inbegrepen in toestelprijs (niet apart aangerekend)", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": 0.0})
 rows.append({"Omschrijving": "Verplaatsing (heen & terug)", "Aantal": f"{km} km", "Eenheidsprijs": "", "Verkoop totaal (EUR)": round(res["km_kost"], 2)})
@@ -146,6 +153,13 @@ if dossier_aanrekenen:
 if res.get("korting_bedrag", 0) > 0:
     rows.append({"Omschrijving": f"Korting — {res['korting_label']}", "Aantal": "", "Eenheidsprijs": "", "Verkoop totaal (EUR)": -round(res["korting_bedrag"], 2)})
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+if arbeid_tonen:
+    _vol = res["uren"] * techniekers * P["uurtarief"]
+    if res["arbeid"] + 0.01 < _vol:
+        st.warning(f"Arbeid aan uurtarief zou € {_vol:,.2f} zijn, maar er kan maar € {res['arbeid']:,.2f} uit de toestelprijs "
+                   "gehaald worden zonder onder je inkoopprijs te zakken. Verlaag de uren of verhoog de toestelprijs.".replace(",", " "))
+    else:
+        st.caption(f"€ {res['arbeid']:,.2f} arbeid uit de toestelprijs gehaald — totaal en marge blijven gelijk.".replace(",", " "))
 
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Subtotaal excl. BTW", f"€ {res['subtotaal']:,.2f}".replace(",", " "))
